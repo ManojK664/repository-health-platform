@@ -38,5 +38,23 @@ execFile(
 
     console.log("Repository commits:");
     console.dir(commits, { depth: null });
+
+    console.log("\nTotal commits:", commits.length);
+
+    console.log("\nCommit messages:");
+
+    commits.forEach((commit) => {
+      console.log("-", commit.message);
+    });
+
+    const authorCounts: Record<string, number> = {};
+
+    commits.forEach((commit) => {
+      authorCounts[commit.authorName] =
+        (authorCounts[commit.authorName] || 0) + 1;
+    });
+
+    console.log("\nCommits by author:");
+    console.log(authorCounts);
   }
 );
