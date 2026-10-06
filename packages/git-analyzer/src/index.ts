@@ -1,5 +1,13 @@
 import { execFile } from "node:child_process";
 import type { Commit } from "./types.js";
+import {
+  getTotalCommits,
+  getActiveDays,
+  getAverageCommitsPerActiveDay,
+  getCommitsByAuthor,
+  getContributorCount,
+  getContributorPercentages
+} from "./analytics.js";
 
 execFile(
   "git",
@@ -65,7 +73,13 @@ execFile(
     console.log("Repository commits:");
     console.dir(commits, { depth: null });
 
-    console.log("\nTotal commits:", commits.length);
+    console.log("\nTotal commits:", getTotalCommits(commits));
+    console.log("Active days:", getActiveDays(commits));
+
+    console.log(
+      "Average commits per active day:",
+      getAverageCommitsPerActiveDay(commits).toFixed(2)
+    );
 
     console.log("\nCommit messages:");
 
@@ -73,15 +87,18 @@ execFile(
       console.log("-", commit.message);
     });
 
-    const authorCounts: Record<string, number> = {};
-
-    commits.forEach((commit) => {
-      authorCounts[commit.authorName] =
-        (authorCounts[commit.authorName] || 0) + 1;
-    });
 
     console.log("\nCommits by author:");
-    console.log(authorCounts);
+    console.log(getCommitsByAuthor(commits));
+
+    console.log(
+      "Total contributors:",
+      getContributorCount(commits)
+    );
+    console.log(
+      "Contributor percentages:",
+      getContributorPercentages(commits)
+    );
 
     console.log("\nFile changes:");
 
