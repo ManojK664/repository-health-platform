@@ -56,3 +56,18 @@ export function getContributorPercentages(
 
   return percentages;
 }
+export function getTopContributor(
+  commits: Commit[]
+): string | null {
+  const authorCounts = getCommitsByAuthor(commits);
+
+  const authors = Object.entries(authorCounts);
+
+  if (authors.length === 0) {
+    return null;
+  }
+
+  authors.sort((a, b) => b[1] - a[1]);
+
+  return authors[0][0];
+}

@@ -6,7 +6,8 @@ import {
   getAverageCommitsPerActiveDay,
   getCommitsByAuthor,
   getContributorCount,
-  getContributorPercentages
+  getContributorPercentages,
+  getTopContributor
 } from "./analytics.js";
 
 execFile(
@@ -99,6 +100,10 @@ execFile(
       "Contributor percentages:",
       getContributorPercentages(commits)
     );
+    console.log(
+      "Top contributor:",
+      getTopContributor(commits)
+);
 
     console.log("\nFile changes:");
 
