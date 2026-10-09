@@ -71,3 +71,25 @@ export function getTopContributor(
 
   return authors[0][0];
 }
+
+
+export function getRankedContributors(
+  commits: Commit[]
+): { author: string; commits: number; percentage: number }[] {
+  const authorCounts = getCommitsByAuthor(commits);
+  const totalCommits = commits.length;
+
+  if (totalCommits === 0) {
+    return [];
+  }
+
+  return Object.entries(authorCounts)
+    .map(([author, count]) => ({
+      author,
+      commits: count,
+      percentage: Number(
+        ((count / totalCommits) * 100).toFixed(2)
+      )
+    }))
+    .sort((a, b) => b.commits - a.commits);
+}

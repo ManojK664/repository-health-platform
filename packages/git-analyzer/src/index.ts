@@ -7,7 +7,8 @@ import {
   getCommitsByAuthor,
   getContributorCount,
   getContributorPercentages,
-  getTopContributor
+  getTopContributor,
+  getRankedContributors
 } from "./analytics.js";
 
 execFile(
@@ -103,7 +104,9 @@ execFile(
     console.log(
       "Top contributor:",
       getTopContributor(commits)
-);
+    );
+    console.log("\nRanked contributors:");
+    console.table(getRankedContributors(commits));
 
     console.log("\nFile changes:");
 
