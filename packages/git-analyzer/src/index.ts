@@ -8,7 +8,11 @@ import {
   getContributorCount,
   getContributorPercentages,
   getTopContributor,
-  getRankedContributors
+  getRankedContributors,
+  getTotalAdditions,
+  getTotalDeletions,
+  getTotalChurn,
+  getChurnByFile
 } from "./analytics.js";
 
 execFile(
@@ -77,6 +81,14 @@ execFile(
 
     console.log("\nTotal commits:", getTotalCommits(commits));
     console.log("Active days:", getActiveDays(commits));
+
+    console.log("\nCode Churn Analysis:");
+    console.log("Total additions:", getTotalAdditions(commits));
+    console.log("Total deletions:", getTotalDeletions(commits));
+    console.log("Total code churn:", getTotalChurn(commits));
+
+    console.log("\nCode Churn by File:");
+    console.table(getChurnByFile(commits).slice(0, 10));
 
     console.log(
       "Average commits per active day:",

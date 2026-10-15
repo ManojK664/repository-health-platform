@@ -93,3 +93,65 @@ export function getRankedContributors(
     }))
     .sort((a, b) => b.commits - a.commits);
 }
+
+
+export function getTotalAdditions(commits: Commit[]): number {
+  return commits.reduce(
+    (total, commit) =>
+      total +
+      commit.files.reduce(
+        (fileTotal, file) => fileTotal + file.additions,
+        0
+      ),
+    0
+  );
+}
+
+export function getTotalDeletions(commits: Commit[]): number {
+  return commits.reduce(
+    (total, commit) =>
+      total +
+      commit.files.reduce(
+        (fileTotal, file) => fileTotal + file.deletions,
+        0
+      ),
+    0
+  );
+}
+
+export function getTotalChurn(commits: Commit[]): number {
+  return getTotalAdditions(commits) + getTotalDeletions(commits);
+}
+
+
+export function getChurnByFile(
+  commits: Commit[]
+): { path: string; additions: number; deletions: number; churn: number }[] {
+  const fileStats: Record<
+    string,
+    { additions: number; deletions: number }
+  > = {};
+
+  commits.forEach((commit) => {
+    commit.files.forEach((file) => {
+      if (!fileStats[file.path]) {
+        fileStats[file.path] = {
+          additions: 0,
+          deletions: 0
+        };
+      }
+
+      fileStats[file.path].additions += file.additions;
+      fileStats[file.path].deletions += file.deletions;
+    });
+  });
+
+  return Object.entries(fileStats)
+    .map(([path, stats]) => ({
+      path,
+      additions: stats.additions,
+      deletions: stats.deletions,
+      churn: stats.additions + stats.deletions
+    }))
+    .sort((a, b) => b.churn - a.churn);
+}
