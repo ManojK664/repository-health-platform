@@ -7,7 +7,8 @@ import {
   getTotalAdditions,
   getTotalDeletions,
   getTotalChurn,
-  getChurnByFile
+  getChurnByFile,
+  getFileOwnership
 } from "./src/analytics.js";
 
 import type { Commit } from "./src/types.js";
@@ -102,3 +103,67 @@ console.table(
     new Date("2026-10-15T10:00:00+05:30")
   )
 );
+
+
+
+const day7Commits: Commit[] = [
+  {
+    hash: "commit1",
+    authorName: "Manoj",
+    authorEmail: "manoj@example.com",
+    date: "2026-10-10T10:00:00+05:30",
+    message: "update app",
+    files: [
+      {
+        path: "src/app.ts",
+        additions: 10,
+        deletions: 2
+      }
+    ]
+  },
+  {
+    hash: "commit2",
+    authorName: "Manoj",
+    authorEmail: "manoj@example.com",
+    date: "2026-10-11T10:00:00+05:30",
+    message: "fix app",
+    files: [
+      {
+        path: "src/app.ts",
+        additions: 4,
+        deletions: 1
+      }
+    ]
+  },
+  {
+    hash: "commit3",
+    authorName: "Alex",
+    authorEmail: "alex@example.com",
+    date: "2026-10-12T10:00:00+05:30",
+    message: "update app",
+    files: [
+      {
+        path: "src/app.ts",
+        additions: 3,
+        deletions: 0
+      }
+    ]
+  },
+  {
+    hash: "commit4",
+    authorName: "Alex",
+    authorEmail: "alex@example.com",
+    date: "2026-10-13T10:00:00+05:30",
+    message: "update utils",
+    files: [
+      {
+        path: "src/utils.ts",
+        additions: 5,
+        deletions: 1
+      }
+    ]
+  }
+];
+
+console.log("\nDay 7 Ownership Test:");
+console.dir(getFileOwnership(day7Commits), { depth: null });

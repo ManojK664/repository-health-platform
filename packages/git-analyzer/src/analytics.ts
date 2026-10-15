@@ -253,3 +253,86 @@ export function getFileStagnation(
     );
 }
 
+
+
+export function getFileOwnership(
+  commits: Commit[]
+): {
+  path: string;
+  totalCommits: number;
+  contributors: {
+    author: string;
+    commits: number;
+    percentage: number;
+  }[];
+  topContributor: string | null;
+  topContributorPercentage: number;
+  estimatedBusFactor: number;
+}[] {
+  const fileStats: Record<string, Record<string, number>> = {};
+
+  commits.forEach((commit) => {
+    commit.files.forEach((file) => {
+      if (!fileStats[file.path]) {
+        fileStats[file.path] = {};
+      }
+
+      const author = commit.authorName;
+
+      fileStats[file.path][author] =
+        (fileStats[file.path][author] || 0) + 1;
+    });
+  });
+
+  return Object.entries(fileStats)
+    .map(([path, authorCounts]) => {
+      const contributors = Object.entries(authorCounts)
+        .map(([author, count]) => ({
+          author,
+          commits: count,
+          percentage: 0
+        }))
+        .sort((a, b) => b.commits - a.commits);
+
+      const totalCommits = contributors.reduce(
+        (total, contributor) => total + contributor.commits,
+        0
+      );
+
+      contributors.forEach((contributor) => {
+        contributor.percentage = Number(
+          ((contributor.commits / totalCommits) * 100).toFixed(2)
+        );
+      });
+
+      const topContributor = contributors[0]?.author ?? null;
+      const topContributorPercentage =
+        contributors[0]?.percentage ?? 0;
+
+      let accumulatedCommits = 0;
+      let estimatedBusFactor = 0;
+
+      for (const contributor of contributors) {
+        accumulatedCommits += contributor.commits;
+        estimatedBusFactor += 1;
+
+        if (accumulatedCommits >= totalCommits / 2) {
+          break;
+        }
+      }
+
+      return {
+        path,
+        totalCommits,
+        contributors,
+        topContributor,
+        topContributorPercentage,
+        estimatedBusFactor
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.estimatedBusFactor - b.estimatedBusFactor ||
+        b.topContributorPercentage - a.topContributorPercentage
+    );
+}

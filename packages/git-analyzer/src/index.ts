@@ -14,7 +14,8 @@ import {
   getTotalChurn,
   getChurnByFile,
   getFileHotspots,
-  getFileStagnation
+  getFileStagnation,
+  getFileOwnership
 } from "./analytics.js";
 
 execFile(
@@ -98,6 +99,21 @@ execFile(
 
     console.log("\nFile Stagnation Analysis:");
     console.table(getFileStagnation(commits).slice(0, 10));
+
+    
+    console.log("\nFile Ownership and Bus-Factor Analysis:");
+
+    const ownershipResults = getFileOwnership(commits);
+
+    console.table(
+      ownershipResults.map((file) => ({
+      path: file.path,
+      totalCommits: file.totalCommits,
+      topContributor: file.topContributor,
+      topContributorPercentage: file.topContributorPercentage,
+      estimatedBusFactor: file.estimatedBusFactor
+    })).slice(0, 10)
+  );
 
 
     console.log(
