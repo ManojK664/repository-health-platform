@@ -12,7 +12,9 @@ import {
   getTotalAdditions,
   getTotalDeletions,
   getTotalChurn,
-  getChurnByFile
+  getChurnByFile,
+  getFileHotspots,
+  getFileStagnation
 } from "./analytics.js";
 
 execFile(
@@ -89,6 +91,14 @@ execFile(
 
     console.log("\nCode Churn by File:");
     console.table(getChurnByFile(commits).slice(0, 10));
+
+    
+    console.log("\nFile Hotspot Analysis:");
+    console.table(getFileHotspots(commits).slice(0, 10));
+
+    console.log("\nFile Stagnation Analysis:");
+    console.table(getFileStagnation(commits).slice(0, 10));
+
 
     console.log(
       "Average commits per active day:",

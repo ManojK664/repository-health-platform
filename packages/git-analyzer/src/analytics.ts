@@ -155,3 +155,101 @@ export function getChurnByFile(
     }))
     .sort((a, b) => b.churn - a.churn);
 }
+
+
+export function getFileHotspots(
+  commits: Commit[]
+): {
+  path: string;
+  changes: number;
+  additions: number;
+  deletions: number;
+  churn: number;
+}[] {
+  const fileStats: Record<
+    string,
+    {
+      changes: number;
+      additions: number;
+      deletions: number;
+    }
+  > = {};
+
+  commits.forEach((commit) => {
+    commit.files.forEach((file) => {
+      if (!fileStats[file.path]) {
+        fileStats[file.path] = {
+          changes: 0,
+          additions: 0,
+          deletions: 0
+        };
+      }
+
+      fileStats[file.path].changes += 1;
+      fileStats[file.path].additions += file.additions;
+      fileStats[file.path].deletions += file.deletions;
+    });
+  });
+
+  return Object.entries(fileStats)
+    .map(([path, stats]) => ({
+      path,
+      changes: stats.changes,
+      additions: stats.additions,
+      deletions: stats.deletions,
+      churn: stats.additions + stats.deletions
+    }))
+    .sort(
+      (a, b) =>
+        b.changes - a.changes || b.churn - a.churn
+    );
+}
+
+
+export function getFileStagnation(
+  commits: Commit[],
+  asOfDate: Date = new Date()
+): {
+  path: string;
+  lastChanged: string;
+  daysSinceLastChange: number;
+}[] {
+  const lastChangedByFile: Record<string, string> = {};
+
+  commits.forEach((commit) => {
+    commit.files.forEach((file) => {
+      const previousDate = lastChangedByFile[file.path];
+
+      if (
+        !previousDate ||
+        new Date(commit.date).getTime() >
+          new Date(previousDate).getTime()
+      ) {
+        lastChangedByFile[file.path] = commit.date;
+      }
+    });
+  });
+
+  return Object.entries(lastChangedByFile)
+    .map(([path, lastChanged]) => {
+      const millisecondsPerDay = 1000 * 60 * 60 * 24;
+
+      const difference =
+        asOfDate.getTime() -
+        new Date(lastChanged).getTime();
+
+      return {
+        path,
+        lastChanged,
+        daysSinceLastChange: Math.max(
+          0,
+          Math.floor(difference / millisecondsPerDay)
+        )
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.daysSinceLastChange - a.daysSinceLastChange
+    );
+}
+
