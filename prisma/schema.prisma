@@ -1,0 +1,74 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id        String     @id @default(cuid())
+  name      String
+  path      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  analyses  Analysis[]
+}
+
+model Analysis {
+  id                    String        @id @default(cuid())
+  repositoryId          String
+  analyzedAt            DateTime      @default(now())
+
+  totalCommits          Int
+  activeDays            Int
+  contributorCount      Int
+  totalFiles            Int
+  totalAdditions        Int
+  totalDeletions        Int
+  totalChurn             Int
+  estimatedBusFactor    Int
+  stagnantFiles         Int
+
+  healthScore           Int
+  healthRating          String
+  scoreBreakdown        Json
+
+  repository            Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  contributors          Contributor[]
+  commits               Commit[]
+
+  @@index([repositoryId, analyzedAt])
+}
+
+model Contributor {
+  id          String   @id @default(cuid())
+  analysisId  String
+  author      String
+  commits     Int
+  percentage  Float
+
+  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model Commit {
+  id           String   @id @default(cuid())
+  analysisId   String
+  hash         String
+  authorName   String
+  authorEmail  String
+  date         DateTime
+  message      String
+  additions    Int      @default(0)
+  deletions    Int      @default(0)
+  churn        Int      @default(0)
+
+  analysis     Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, hash])
+  @@index([analysisId])
+}
