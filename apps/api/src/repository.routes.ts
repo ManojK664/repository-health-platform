@@ -206,4 +206,38 @@ router.get("/analyze", async (_req, res) => {
   }
 });
 
+// GET /api/repository/history
+router.get("/history", async (_req, res) => {
+  try {
+    const history = await prisma.analysis.findMany({
+      orderBy: {
+        analyzedAt: "desc",
+      },
+      select: {
+        id: true,
+        analyzedAt: true,
+        totalCommits: true,
+        activeDays: true,
+        contributorCount: true,
+        totalFiles: true,
+        healthScore: true,
+        healthRating: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      count: history.length,
+      history,
+    });
+  } catch (error) {
+    console.error("Failed to retrieve analysis history:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Unable to retrieve analysis history",
+    });
+  }
+});
+
 export default router;
