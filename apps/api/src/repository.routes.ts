@@ -240,4 +240,48 @@ router.get("/history", async (_req, res) => {
   }
 });
 
+// GET /api/repository/history/:id
+router.get("/history/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const analysis = await prisma.analysis.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        contributors: {
+          orderBy: {
+            commits: "desc",
+          },
+        },
+        commits: {
+          orderBy: {
+            date: "desc",
+          },
+        },
+        repository: true,
+      },
+    });
+
+    if (!analysis) {
+      return res.status(404).json({
+        success: false,
+        message: "Analysis not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      analysis,
+    });
+  } catch (error) {
+    console.error("Failed to retrieve analysis:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to retrieve analysis details",
+    });
+  }
+});
 export default router;
