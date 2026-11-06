@@ -3,6 +3,16 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
 type Analysis = {
   id: string;
   analyzedAt: string;
@@ -12,6 +22,11 @@ type Analysis = {
   totalFiles: number;
   healthScore: number;
   healthRating: string;
+  totalAdditions: number;
+  totalDeletions: number;
+  totalChurn: number;
+  estimatedBusFactor: number;
+  stagnantFiles: number;
 };
 
 type HistoryResponse = {
@@ -56,6 +71,12 @@ export default function Home() {
   }, []);
 
   const latest = history[0];
+  const codeChangesData = latest
+  ? [
+      { name: "Additions", lines: latest.totalAdditions },
+      { name: "Deletions", lines: latest.totalDeletions },
+    ]
+  : [];
 
   const metrics = [
     {
@@ -169,6 +190,81 @@ export default function Home() {
             )}
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  
+{/* Code Churn Analytics */}
+<div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
+  <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h3 className="text-lg font-semibold">Code Churn Analytics</h3>
+      <p className="mt-1 text-sm text-slate-500">
+        Comparison of code additions and deletions
+      </p>
+    </div>
+    <span className="rounded-md bg-blue-500/10 px-3 py-1.5 text-xs text-blue-400">
+      Latest Analysis
+    </span>
+  </div>
+
+  {latest ? (
+    <>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-lg bg-slate-900 p-4">
+          <p className="text-xs text-slate-400">Lines Added</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-400">
+            {latest.totalAdditions.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-slate-900 p-4">
+          <p className="text-xs text-slate-400">Lines Deleted</p>
+          <p className="mt-2 text-2xl font-bold text-red-400">
+            {latest.totalDeletions.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-slate-900 p-4">
+          <p className="text-xs text-slate-400">Total Churn</p>
+          <p className="mt-2 text-2xl font-bold text-blue-400">
+            {latest.totalChurn.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      <div className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={codeChangesData}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#334155"
+              vertical={false}
+            />
+            <XAxis dataKey="name" stroke="#94a3b8" />
+            <YAxis stroke="#94a3b8" />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#0e1528",
+                border: "1px solid #334155",
+                borderRadius: "8px",
+                color: "#ffffff",
+              }}
+            />
+            <Bar
+              dataKey="lines"
+              name="Lines of code"
+              fill="#3b82f6"
+              radius={[6, 6, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </>
+  ) : (
+    <p className="py-12 text-center text-slate-500">
+      No code change data available.
+    </p>
+  )}
+</div>
+
               {metrics.map((metric) => (
                 <div key={metric.label} className="rounded-xl border border-slate-800 bg-[#111a2e] p-5 transition hover:border-slate-600">
                   <div className="flex items-center justify-between">

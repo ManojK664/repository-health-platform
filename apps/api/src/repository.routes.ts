@@ -220,9 +220,20 @@ router.get("/history", async (_req, res) => {
         activeDays: true,
         contributorCount: true,
         totalFiles: true,
+
+        // Code change metrics
+        totalAdditions: true,
+        totalDeletions: true,
+        totalChurn: true,
+
+        // Repository risk metrics
+        estimatedBusFactor: true,
+        stagnantFiles: true,
+
+        // Health metrics
         healthScore: true,
         healthRating: true,
-      },
+    },
     });
 
     res.status(200).json({
