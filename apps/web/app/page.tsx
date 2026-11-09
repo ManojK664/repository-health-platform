@@ -11,8 +11,13 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
+// Analysis data from PostgreSQL
 type Analysis = {
   id: string;
   analyzedAt: string;
@@ -20,13 +25,20 @@ type Analysis = {
   activeDays: number;
   contributorCount: number;
   totalFiles: number;
-  healthScore: number;
-  healthRating: string;
   totalAdditions: number;
   totalDeletions: number;
   totalChurn: number;
   estimatedBusFactor: number;
   stagnantFiles: number;
+  healthScore: number;
+  healthRating: string;
+};
+
+// Contributor information
+type Contributor = {
+  author: string;
+  commits: number;
+  percentage: number;
 };
 
 type HistoryResponse = {
@@ -35,17 +47,30 @@ type HistoryResponse = {
   history: Analysis[];
 };
 
+const API_URL = "http://127.0.0.1:5000/api/repository";
+
+const CHART_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#a855f7",
+  "#f59e0b",
+  "#ef4444",
+];
+
 export default function Home() {
   const [history, setHistory] = useState<Analysis[]>([]);
+  const [contributors, setContributors] = useState<Contributor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Fetch analysis history and contributor details
   useEffect(() => {
-    async function loadHistory() {
+    async function loadDashboard() {
       try {
-        const response = await fetch(
-          "http://127.0.0.1:5000/api/repository/history"
-        );
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(`${API_URL}/history`);
 
         if (!response.ok) {
           throw new Error("Unable to connect to the backend API.");
@@ -57,27 +82,61 @@ export default function Home() {
           throw new Error("Could not retrieve analysis history.");
         }
 
-        setHistory(data.history ?? []);
+        const analyses = data.history ?? [];
+
+        setHistory(analyses);
+
+        // Fetch contributors for the latest analysis
+        if (analyses.length > 0) {
+          const latestAnalysis = analyses[0];
+
+          const detailResponse = await fetch(
+            `${API_URL}/history/${latestAnalysis.id}`
+          );
+
+          if (!detailResponse.ok) {
+            throw new Error("Unable to load contributor details.");
+          }
+
+          const detailData = await detailResponse.json();
+
+          setContributors(
+            detailData.analysis?.contributors ?? []
+          );
+        } else {
+          setContributors([]);
+        }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Something went wrong."
+          err instanceof Error
+            ? err.message
+            : "Something went wrong."
         );
       } finally {
         setLoading(false);
       }
     }
 
-    loadHistory();
+    loadDashboard();
   }, []);
 
   const latest = history[0];
-  const codeChangesData = latest
-  ? [
-      { name: "Additions", lines: latest.totalAdditions },
-      { name: "Deletions", lines: latest.totalDeletions },
-    ]
-  : [];
 
+  // Code churn chart data
+  const codeChangesData = latest
+    ? [
+        {
+          name: "Additions",
+          lines: latest.totalAdditions,
+        },
+        {
+          name: "Deletions",
+          lines: latest.totalDeletions,
+        },
+      ]
+    : [];
+
+  // Repository metric cards
   const metrics = [
     {
       label: "Total Commits",
@@ -108,14 +167,20 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#0b1020] text-slate-100">
       <div className="flex min-h-screen">
+
+        {/* Sidebar */}
         <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-[#0e1528] p-6 md:flex md:flex-col">
           <div className="mb-10">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold">
                 R
               </div>
+
               <div>
-                <h1 className="text-lg font-bold">RepoHealth</h1>
+                <h1 className="text-lg font-bold">
+                  RepoHealth
+                </h1>
+
                 <p className="text-xs text-slate-400">
                   Intelligence Platform
                 </p>
@@ -128,154 +193,131 @@ export default function Home() {
           </p>
 
           <nav className="space-y-2">
-            <a href="#overview" className="flex items-center gap-3 rounded-lg bg-blue-600/15 px-4 py-3 text-sm font-medium text-blue-400">
-              <span>▦</span> Overview
+            <a
+              href="#overview"
+              className="flex items-center gap-3 rounded-lg bg-blue-600/15 px-4 py-3 text-sm font-medium text-blue-400"
+            >
+              <span>▦</span>
+              Overview
             </a>
-            <a href="#metrics" className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white">
-              <span>◈</span> Repository Metrics
+
+            <a
+              href="#metrics"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            >
+              <span>◈</span>
+              Repository Metrics
             </a>
-            <a href="#history" className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white">
-              <span>◷</span> Analysis History
+
+            <a
+              href="#history"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            >
+              <span>◷</span>
+              Analysis History
             </a>
           </nav>
 
           <div className="mt-auto rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-            <p className="text-sm font-semibold">System Status</p>
+            <p className="text-sm font-semibold">
+              System Status
+            </p>
+
             <div className="mt-3 flex items-center gap-2 text-sm text-emerald-400">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               Dashboard online
             </div>
+
             <p className="mt-2 text-xs text-slate-500">
               Repository analytics platform
             </p>
           </div>
         </aside>
 
+        {/* Main Content */}
         <section className="min-w-0 flex-1">
+
+          {/* Header */}
           <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 bg-[#0e1528] px-5 py-5 md:px-9">
             <div>
-              <p className="text-xs text-slate-500">Workspace / Overview</p>
-              <h2 className="mt-1 text-xl font-bold">Repository Dashboard</h2>
+              <p className="text-xs text-slate-500">
+                Workspace / Overview
+              </p>
+
+              <h2 className="mt-1 text-xl font-bold">
+                Repository Dashboard
+              </h2>
             </div>
+
             <div className="flex items-center gap-3">
               <span className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400">
                 Local Analysis
               </span>
+
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 font-semibold">
                 M
               </div>
             </div>
           </header>
 
-          <div id="overview" className="space-y-7 p-5 md:p-9">
+          <div
+            id="overview"
+            className="space-y-7 p-5 md:p-9"
+          >
+
+            {/* Page Heading */}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-sm text-blue-400">REPOSITORY INTELLIGENCE</p>
+                <p className="text-sm text-blue-400">
+                  REPOSITORY INTELLIGENCE
+                </p>
+
                 <h1 className="mt-2 text-3xl font-bold tracking-tight">
                   Overview
                 </h1>
+
                 <p className="mt-2 text-sm text-slate-400">
                   Monitor repository health, development activity and risks.
                 </p>
               </div>
-              <a href="#history" className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold transition hover:bg-blue-500">
+
+              <a
+                href="#history"
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
+              >
                 View analysis history →
               </a>
             </div>
 
+            {/* Error Message */}
             {error && (
               <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                {error} Make sure your backend is running on port 5000.
+                {error}
+                {" "}Make sure your backend is running on port 5000.
               </div>
             )}
 
+            {/* Repository Metric Cards */}
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  
-{/* Code Churn Analytics */}
-<div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
-  <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <h3 className="text-lg font-semibold">Code Churn Analytics</h3>
-      <p className="mt-1 text-sm text-slate-500">
-        Comparison of code additions and deletions
-      </p>
-    </div>
-    <span className="rounded-md bg-blue-500/10 px-3 py-1.5 text-xs text-blue-400">
-      Latest Analysis
-    </span>
-  </div>
-
-  {latest ? (
-    <>
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-lg bg-slate-900 p-4">
-          <p className="text-xs text-slate-400">Lines Added</p>
-          <p className="mt-2 text-2xl font-bold text-emerald-400">
-            {latest.totalAdditions.toLocaleString()}
-          </p>
-        </div>
-
-        <div className="rounded-lg bg-slate-900 p-4">
-          <p className="text-xs text-slate-400">Lines Deleted</p>
-          <p className="mt-2 text-2xl font-bold text-red-400">
-            {latest.totalDeletions.toLocaleString()}
-          </p>
-        </div>
-
-        <div className="rounded-lg bg-slate-900 p-4">
-          <p className="text-xs text-slate-400">Total Churn</p>
-          <p className="mt-2 text-2xl font-bold text-blue-400">
-            {latest.totalChurn.toLocaleString()}
-          </p>
-        </div>
-      </div>
-
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={codeChangesData}>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#334155"
-              vertical={false}
-            />
-            <XAxis dataKey="name" stroke="#94a3b8" />
-            <YAxis stroke="#94a3b8" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#0e1528",
-                border: "1px solid #334155",
-                borderRadius: "8px",
-                color: "#ffffff",
-              }}
-            />
-            <Bar
-              dataKey="lines"
-              name="Lines of code"
-              fill="#3b82f6"
-              radius={[6, 6, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </>
-  ) : (
-    <p className="py-12 text-center text-slate-500">
-      No code change data available.
-    </p>
-  )}
-</div>
-
               {metrics.map((metric) => (
-                <div key={metric.label} className="rounded-xl border border-slate-800 bg-[#111a2e] p-5 transition hover:border-slate-600">
+                <div
+                  key={metric.label}
+                  className="rounded-xl border border-slate-800 bg-[#111a2e] p-5 transition hover:border-slate-600"
+                >
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-400">{metric.label}</p>
+                    <p className="text-sm text-slate-400">
+                      {metric.label}
+                    </p>
+
                     <span className={`text-xl ${metric.color}`}>
                       {metric.icon}
                     </span>
                   </div>
+
                   <p className="mt-5 text-3xl font-bold">
                     {loading ? "..." : metric.value}
                   </p>
+
                   <p className="mt-2 text-xs text-slate-500">
                     Latest repository analysis
                   </p>
@@ -283,31 +325,308 @@ export default function Home() {
               ))}
             </div>
 
-            <div id="metrics" className="grid gap-5 lg:grid-cols-3">
+            {/* Code Churn Analytics */}
+            <div
+              id="metrics"
+              className="rounded-xl border border-slate-800 bg-[#111a2e] p-6"
+            >
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    Code Churn Analytics
+                  </h3>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Comparison of code additions and deletions
+                  </p>
+                </div>
+
+                <span className="rounded-md bg-blue-500/10 px-3 py-1.5 text-xs text-blue-400">
+                  Latest Analysis
+                </span>
+              </div>
+
+              {latest ? (
+                <>
+                  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-lg bg-slate-900 p-4">
+                      <p className="text-xs text-slate-400">
+                        Lines Added
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-emerald-400">
+                        {latest.totalAdditions.toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-900 p-4">
+                      <p className="text-xs text-slate-400">
+                        Lines Deleted
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-red-400">
+                        {latest.totalDeletions.toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-900 p-4">
+                      <p className="text-xs text-slate-400">
+                        Total Churn
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-blue-400">
+                        {latest.totalChurn.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={codeChangesData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#334155"
+                          vertical={false}
+                        />
+
+                        <XAxis
+                          dataKey="name"
+                          stroke="#94a3b8"
+                        />
+
+                        <YAxis stroke="#94a3b8" />
+
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#0e1528",
+                            border: "1px solid #334155",
+                            borderRadius: "8px",
+                            color: "#ffffff",
+                          }}
+                        />
+
+                        <Bar
+                          dataKey="lines"
+                          name="Lines of code"
+                          fill="#3b82f6"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
+              ) : (
+                <p className="py-12 text-center text-slate-500">
+                  {loading
+                    ? "Loading code change data..."
+                    : "No code change data available."}
+                </p>
+              )}
+            </div>
+
+            {/* Contributor Distribution */}
+            <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold">
+                  Contributor Distribution
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Contribution share by repository contributor
+                </p>
+              </div>
+
+              {loading ? (
+                <p className="py-12 text-center text-slate-500">
+                  Loading contributor data...
+                </p>
+              ) : contributors.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2">
+
+                  {/* Pie Chart */}
+                  <div className="h-72 min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={contributors}
+                          dataKey="commits"
+                          nameKey="author"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          label
+                        >
+                          {contributors.map((contributor, index) => (
+                            <Cell
+                              key={contributor.author}
+                              fill={CHART_COLORS[index % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#0e1528",
+                            border: "1px solid #334155",
+                            borderRadius: "8px",
+                            color: "#ffffff",
+                          }}
+                        />
+
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Contributor Details */}
+                  <div className="space-y-4">
+                    {contributors.map((contributor, index) => (
+                      <div
+                        key={`${contributor.author}-${index}`}
+                        className="rounded-lg bg-slate-900 p-4"
+                      >
+                        <div className="flex flex-wrap justify-between gap-3">
+                          <span className="text-sm font-medium">
+                            {contributor.author}
+                          </span>
+
+                          <span className="text-sm font-semibold text-blue-400">
+                            {contributor.percentage.toFixed(1)}%
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-xs text-slate-400">
+                          {contributor.commits} commits
+                        </p>
+
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-700">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.max(0, contributor.percentage)
+                              )}%`,
+                              backgroundColor:
+                                CHART_COLORS[index % CHART_COLORS.length],
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="py-12 text-center text-slate-500">
+                  No contributor data available.
+                </p>
+              )}
+            </div>
+
+            {/* Repository Risk Analysis */}
+            <div className="grid gap-5 md:grid-cols-2">
+
+              {/* Bus Factor */}
+              <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">
+                    Bus Factor
+                  </h3>
+
+                  <span className="text-xl text-orange-400">
+                    ⚠
+                  </span>
+                </div>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  Contributor concentration risk
+                </p>
+
+                <p className="mt-6 text-4xl font-bold text-orange-400">
+                  {loading ? "..." : latest?.estimatedBusFactor ?? "—"}
+                </p>
+
+                <p className="mt-2 text-sm text-slate-400">
+                  Estimated contributors accounting for at least 50% of commits
+                </p>
+
+                <div className="mt-5 rounded-lg bg-orange-500/10 p-3 text-sm text-orange-300">
+                  {latest?.estimatedBusFactor === 1
+                    ? "High concentration: one contributor accounts for at least half of commits."
+                    : "Review contributor distribution to assess knowledge concentration."}
+                </div>
+              </div>
+
+              {/* Stagnant Files */}
+              <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">
+                    Stagnant Files
+                  </h3>
+
+                  <span className="text-xl text-red-400">
+                    ◷
+                  </span>
+                </div>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  Repository maintenance indicator
+                </p>
+
+                <p className="mt-6 text-4xl font-bold text-red-400">
+                  {loading ? "..." : latest?.stagnantFiles ?? "—"}
+                </p>
+
+                <p className="mt-2 text-sm text-slate-400">
+                  Files unchanged for more than 30 days
+                </p>
+
+                <div className="mt-5 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
+                  Review these files to identify potentially outdated code.
+                </div>
+              </div>
+            </div>
+
+            {/* Health Score and Repository Summary */}
+            <div className="grid gap-5 lg:grid-cols-3">
+
+              {/* Health Score */}
               <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
                 <p className="text-sm font-medium text-slate-400">
                   Repository Health Score
                 </p>
+
                 <div className="mt-7 flex flex-col items-center">
                   <div className="flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-slate-700">
                     <div className="text-center">
                       <p className="text-4xl font-bold">
                         {loading ? "..." : latest?.healthScore ?? "—"}
                       </p>
-                      <p className="text-xs text-slate-500">out of 100</p>
+
+                      <p className="text-xs text-slate-500">
+                        out of 100
+                      </p>
                     </div>
                   </div>
+
                   <p className="mt-5 text-sm font-semibold text-slate-300">
-                    {loading ? "Loading analysis..." : latest?.healthRating ?? "No analysis yet"}
+                    {loading
+                      ? "Loading analysis..."
+                      : latest?.healthRating ?? "No analysis yet"}
                   </p>
+
                   <p className="mt-2 text-center text-xs text-slate-500">
                     Based on the latest saved analysis
                   </p>
                 </div>
               </div>
 
+              {/* Repository Summary */}
               <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6 lg:col-span-2">
-                <h3 className="font-semibold">Repository Summary</h3>
+                <h3 className="font-semibold">
+                  Repository Summary
+                </h3>
+
                 <p className="mt-1 text-xs text-slate-500">
                   Latest analysis information
                 </p>
@@ -315,29 +634,73 @@ export default function Home() {
                 {latest ? (
                   <div className="mt-7 grid gap-5 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs text-slate-500">Analysis ID</p>
-                      <p className="mt-2 break-all text-sm text-slate-200">{latest.id}</p>
+                      <p className="text-xs text-slate-500">
+                        Analysis ID
+                      </p>
+
+                      <p className="mt-2 break-all text-sm text-slate-200">
+                        {latest.id}
+                      </p>
                     </div>
+
                     <div>
-                      <p className="text-xs text-slate-500">Last Analyzed</p>
+                      <p className="text-xs text-slate-500">
+                        Last Analyzed
+                      </p>
+
                       <p className="mt-2 text-sm text-slate-200">
                         {new Date(latest.analyzedAt).toLocaleString()}
                       </p>
                     </div>
+
                     <div>
-                      <p className="text-xs text-slate-500">Health Rating</p>
-                      <p className="mt-2 text-sm text-slate-200">{latest.healthRating}</p>
+                      <p className="text-xs text-slate-500">
+                        Health Rating
+                      </p>
+
+                      <p className="mt-2 text-sm text-slate-200">
+                        {latest.healthRating}
+                      </p>
                     </div>
+
                     <div>
-                      <p className="text-xs text-slate-500">Saved Analyses</p>
-                      <p className="mt-2 text-sm text-slate-200">{history.length}</p>
+                      <p className="text-xs text-slate-500">
+                        Saved Analyses
+                      </p>
+
+                      <p className="mt-2 text-sm text-slate-200">
+                        {history.length}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-500">
+                        Estimated Bus Factor
+                      </p>
+
+                      <p className="mt-2 text-sm text-slate-200">
+                        {latest.estimatedBusFactor}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-500">
+                        Stagnant Files
+                      </p>
+
+                      <p className="mt-2 text-sm text-slate-200">
+                        {latest.stagnantFiles}
+                      </p>
                     </div>
                   </div>
                 ) : (
                   <div className="mt-8 rounded-lg border border-dashed border-slate-700 p-7 text-center">
                     <p className="font-medium text-slate-300">
-                      {loading ? "Loading repository data..." : "No analysis found"}
+                      {loading
+                        ? "Loading repository data..."
+                        : "No analysis found"}
                     </p>
+
                     <p className="mt-2 text-xs text-slate-500">
                       Run a repository analysis to see your metrics here.
                     </p>
@@ -346,14 +709,22 @@ export default function Home() {
               </div>
             </div>
 
-            <div id="history" className="overflow-hidden rounded-xl border border-slate-800 bg-[#111a2e]">
+            {/* Analysis History */}
+            <div
+              id="history"
+              className="overflow-hidden rounded-xl border border-slate-800 bg-[#111a2e]"
+            >
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 p-6">
                 <div>
-                  <h3 className="font-semibold">Recent Analysis History</h3>
+                  <h3 className="font-semibold">
+                    Recent Analysis History
+                  </h3>
+
                   <p className="mt-1 text-xs text-slate-500">
                     Previously saved repository analyses
                   </p>
                 </div>
+
                 <span className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-400">
                   {history.length} records
                 </span>
@@ -366,25 +737,60 @@ export default function Home() {
                       <th className="px-6 py-4 font-medium">Analysis ID</th>
                       <th className="px-6 py-4 font-medium">Date</th>
                       <th className="px-6 py-4 font-medium">Commits</th>
+                      <th className="px-6 py-4 font-medium">Additions</th>
+                      <th className="px-6 py-4 font-medium">Deletions</th>
+                      <th className="px-6 py-4 font-medium">Code Churn</th>
                       <th className="px-6 py-4 font-medium">Health Score</th>
                       <th className="px-6 py-4 font-medium">Rating</th>
                     </tr>
                   </thead>
+
                   <tbody className="divide-y divide-slate-800">
                     {history.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-800/40">
-                        <td className="max-w-48 truncate px-6 py-4 text-blue-400">{item.id}</td>
+                      <tr
+                        key={item.id}
+                        className="transition hover:bg-slate-800/40"
+                      >
+                        <td className="max-w-48 truncate px-6 py-4 text-blue-400">
+                          {item.id}
+                        </td>
+
                         <td className="whitespace-nowrap px-6 py-4 text-slate-400">
                           {new Date(item.analyzedAt).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4">{item.totalCommits}</td>
-                        <td className="px-6 py-4 font-semibold">{item.healthScore}/100</td>
-                        <td className="px-6 py-4 text-slate-300">{item.healthRating}</td>
+
+                        <td className="px-6 py-4">
+                          {item.totalCommits}
+                        </td>
+
+                        <td className="px-6 py-4 text-emerald-400">
+                          {item.totalAdditions.toLocaleString()}
+                        </td>
+
+                        <td className="px-6 py-4 text-red-400">
+                          {item.totalDeletions.toLocaleString()}
+                        </td>
+
+                        <td className="px-6 py-4 text-blue-400">
+                          {item.totalChurn.toLocaleString()}
+                        </td>
+
+                        <td className="px-6 py-4 font-semibold">
+                          {item.healthScore}/100
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-300">
+                          {item.healthRating}
+                        </td>
                       </tr>
                     ))}
+
                     {!loading && history.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                        <td
+                          colSpan={8}
+                          className="px-6 py-8 text-center text-slate-500"
+                        >
                           No saved analysis records available.
                         </td>
                       </tr>
@@ -394,6 +800,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Footer */}
             <p className="pb-4 text-center text-xs text-slate-600">
               Repository Health Intelligence Platform · Development Version
             </p>
