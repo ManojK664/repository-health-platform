@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   BarChart,
@@ -62,63 +62,72 @@ export default function Home() {
   const [contributors, setContributors] = useState<Contributor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch analysis history and contributor details
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
+  // Load dashboard data from the backend API
+  // Manual refresh updates data without reloading the browser page.
+  const loadDashboard = useCallback(async (isManualRefresh = false) => {
+    try {
+      if (isManualRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        setError("");
-
-        const response = await fetch(`${API_URL}/history`);
-
-        if (!response.ok) {
-          throw new Error("Unable to connect to the backend API.");
-        }
-
-        const data: HistoryResponse = await response.json();
-
-        if (!data.success) {
-          throw new Error("Could not retrieve analysis history.");
-        }
-
-        const analyses = data.history ?? [];
-
-        setHistory(analyses);
-
-        // Fetch contributors for the latest analysis
-        if (analyses.length > 0) {
-          const latestAnalysis = analyses[0];
-
-          const detailResponse = await fetch(
-            `${API_URL}/history/${latestAnalysis.id}`
-          );
-
-          if (!detailResponse.ok) {
-            throw new Error("Unable to load contributor details.");
-          }
-
-          const detailData = await detailResponse.json();
-
-          setContributors(
-            detailData.analysis?.contributors ?? []
-          );
-        } else {
-          setContributors([]);
-        }
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong."
-        );
-      } finally {
-        setLoading(false);
       }
-    }
 
-    loadDashboard();
+      setError("");
+
+      const response = await fetch(`${API_URL}/history`);
+
+      if (!response.ok) {
+        throw new Error("Unable to connect to the backend API.");
+      }
+
+      const data: HistoryResponse = await response.json();
+
+      if (!data.success) {
+        throw new Error("Could not retrieve analysis history.");
+      }
+
+      const analyses = data.history ?? [];
+
+      setHistory(analyses);
+
+      // Fetch contributors for the latest analysis
+      if (analyses.length > 0) {
+        const latestAnalysis = analyses[0];
+
+        const detailResponse = await fetch(
+          `${API_URL}/history/${latestAnalysis.id}`
+        );
+
+        if (!detailResponse.ok) {
+          throw new Error("Unable to load contributor details.");
+        }
+
+        const detailData = await detailResponse.json();
+
+        setContributors(
+          detailData.analysis?.contributors ?? []
+        );
+      } else {
+        setContributors([]);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong."
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  // Load dashboard data when the page first opens
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   const latest = history[0];
 
@@ -253,6 +262,25 @@ export default function Home() {
               <span className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400">
                 Local Analysis
               </span>
+
+              {/* Dashboard Refresh Button */}
+              <button
+                type="button"
+                onClick={() => void loadDashboard(true)}
+                disabled={refreshing || loading}
+                className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Refresh Dashboard"
+              >
+                <span className={refreshing ? "animate-spin" : ""}>
+                  ↻
+                </span>
+
+                {refreshing
+                  ? "Refreshing..."
+                  : loading
+                    ? "Loading..."
+                    : "Refresh"}
+              </button>
 
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 font-semibold">
                 M
