@@ -83,6 +83,14 @@ const CHART_COLORS = [
   "#ef4444",
 ];
 
+// Toast notification model
+type Toast = {
+  id: string;
+  type: "success" | "error" | "info";
+  title: string;
+  message?: string;
+};
+
 export default function Home() {
   const [history, setHistory] = useState<Analysis[]>([]);
   const [contributors, setContributors] = useState<Contributor[]>([]);
@@ -92,6 +100,24 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
   const [comparisonId, setComparisonId] = useState("");
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = useCallback(
+    (type: "success" | "error" | "info", title: string, message?: string) => {
+      const id = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      setToasts((prev) => [...prev, { id, type, title, message }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4500);
+    },
+    []
+  );
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   // Individual analysis detail panel
   const [detailPanel, setDetailPanel] = useState<AnalysisDetail | null>(null);
@@ -123,13 +149,15 @@ export default function Home() {
       const response = await fetch(`${API_URL}/history`);
 
       if (!response.ok) {
-        throw new Error("Unable to connect to the backend API.");
+        throw new Error(
+          `Backend API connection error (HTTP ${response.status}). Ensure the server is online.`
+        );
       }
 
       const data: HistoryResponse = await response.json();
 
       if (!data.success) {
-        throw new Error("Could not retrieve analysis history.");
+        throw new Error("Could not retrieve analysis history from the database.");
       }
 
       const analyses = data.history ?? [];
@@ -156,17 +184,24 @@ export default function Home() {
       } else {
         setContributors([]);
       }
+
+      if (isManualRefresh) {
+        addToast("success", "Dashboard Refreshed", "Latest repository metrics synchronized.");
+      }
     } catch (err) {
-      setError(
+      const errMsg =
         err instanceof Error
           ? err.message
-          : "Something went wrong."
-      );
+          : "Unable to connect to the backend API.";
+      setError(errMsg);
+      if (isManualRefresh) {
+        addToast("error", "Refresh Failed", errMsg);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [addToast]);
 
   // Load dashboard data when the page first opens
   useEffect(() => {
@@ -182,7 +217,7 @@ export default function Home() {
       const response = await fetch(`${API_URL}/analyze`);
 
       if (!response.ok) {
-        throw new Error("Analysis request failed.");
+        throw new Error(`Analysis failed with status code ${response.status}.`);
       }
 
       const data = await response.json();
@@ -192,10 +227,15 @@ export default function Home() {
       }
 
       await loadDashboard(true);
-    } catch (err) {
-      setAnalyzeError(
-        err instanceof Error ? err.message : "Analysis failed."
+      addToast(
+        "success",
+        "Analysis Complete",
+        "Repository analyzed successfully and recorded in history."
       );
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Analysis failed.";
+      setAnalyzeError(errMsg);
+      addToast("error", "Analysis Failed", errMsg);
     } finally {
       setAnalyzing(false);
     }
@@ -350,6 +390,7 @@ export default function Home() {
     link.download = `repo-health-analysis-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    addToast("success", "CSV Exported", "Analysis history downloaded successfully.");
   };
 
   // Filter and sort analysis history
@@ -716,48 +757,132 @@ export default function Home() {
               </a>
             </div>
 
-            {/* Error Message */}
+            {/* Backend Connection Error Banner with Retry Options */}
             {error && (
-              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                {error}
-                {" "}Make sure your backend is running on port 5000.
-              </div>
-            )}
-
-            {/* Analysis Error */}
-            {analyzeError && (
-              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                Analysis failed: {analyzeError}
-              </div>
-            )}
-
-            {/* Repository Metric Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {metrics.map((metric) => (
-                <div
-                  key={metric.label}
-                  className="rounded-xl border border-slate-800 bg-[#111a2e] p-5 transition hover:border-slate-600"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-400">
-                      {metric.label}
-                    </p>
-
-                    <span className={`text-xl ${metric.color}`}>
-                      {metric.icon}
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-5 text-red-200 shadow-lg">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/20 text-lg text-red-400">
+                      ⚠
                     </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-white">
+                          Backend Connection Offline
+                        </h3>
+                        <span className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-300">
+                          API Error
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-red-300">
+                        {error}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-400">
+                        Target API: <code className="font-mono text-slate-300">http://127.0.0.1:5000/api/repository</code>. Ensure the API server is running with <code className="font-mono text-slate-300">npm run dev:api</code>.
+                      </p>
+                    </div>
                   </div>
 
-                  <p className="mt-5 text-3xl font-bold">
-                    {loading ? "..." : metric.value}
-                  </p>
-
-                  <p className="mt-2 text-xs text-slate-500">
-                    Latest repository analysis
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadDashboard(true)}
+                      disabled={refreshing || loading}
+                      className="flex items-center gap-2 rounded-lg bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                    >
+                      <span className={refreshing ? "animate-spin" : ""}>↻</span>
+                      {refreshing ? "Retrying..." : "Retry Connection"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setError("")}
+                      className="rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/20"
+                      title="Dismiss alert"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* Analysis Execution Error Banner */}
+            {analyzeError && (
+              <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-4 text-orange-200">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl text-orange-400">⚙</span>
+                    <div>
+                      <p className="text-sm font-semibold text-white">Analysis Failed</p>
+                      <p className="text-xs text-orange-300">{analyzeError}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void runAnalysis()}
+                      disabled={analyzing}
+                      className="rounded-lg bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-500"
+                    >
+                      Retry Analysis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnalyzeError("")}
+                      className="text-xs text-orange-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Repository Metric Cards / Skeleton Loading */}
+            {loading ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {[1, 2, 3, 4].map((skeleton) => (
+                  <div
+                    key={skeleton}
+                    className="animate-pulse rounded-xl border border-slate-800 bg-[#111a2e] p-5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="h-4 w-24 rounded bg-slate-800" />
+                      <div className="h-6 w-6 rounded-lg bg-slate-800" />
+                    </div>
+                    <div className="mt-5 h-8 w-20 rounded bg-slate-800" />
+                    <div className="mt-2 h-3 w-32 rounded bg-slate-800" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {metrics.map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="rounded-xl border border-slate-800 bg-[#111a2e] p-5 transition hover:border-slate-600"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-slate-400">
+                        {metric.label}
+                      </p>
+
+                      <span className={`text-xl ${metric.color}`}>
+                        {metric.icon}
+                      </span>
+                    </div>
+
+                    <p className="mt-5 text-3xl font-bold">
+                      {metric.value}
+                    </p>
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      Latest repository analysis
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Code Churn Analytics */}
             <div
@@ -780,7 +905,16 @@ export default function Home() {
                 </span>
               </div>
 
-              {latest ? (
+              {loading ? (
+                <div className="animate-pulse space-y-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-20 rounded-lg bg-slate-900" />
+                    ))}
+                  </div>
+                  <div className="h-64 sm:h-72 w-full rounded-lg bg-slate-900" />
+                </div>
+              ) : latest ? (
                 <>
                   <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="rounded-lg bg-slate-900 p-4">
@@ -850,11 +984,23 @@ export default function Home() {
                   </div>
                 </>
               ) : (
-                <p className="py-12 text-center text-slate-500">
-                  {loading
-                    ? "Loading code change data..."
-                    : "No code change data available."}
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-2xl text-blue-400">
+                    📊
+                  </div>
+                  <p className="font-semibold text-slate-300">No Code Churn Data</p>
+                  <p className="mt-1 max-w-sm text-xs text-slate-500">
+                    Run a repository analysis to visualize code additions, deletions, and churn.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void runAnalysis()}
+                    disabled={analyzing}
+                    className="mt-4 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
+                  >
+                    ⚙ Run Analysis
+                  </button>
+                </div>
               )}
             </div>
 
@@ -871,9 +1017,14 @@ export default function Home() {
               </div>
 
               {loading ? (
-                <p className="py-12 text-center text-slate-500">
-                  Loading contributor data...
-                </p>
+                <div className="grid animate-pulse gap-6 md:grid-cols-2">
+                  <div className="h-64 sm:h-72 rounded-lg bg-slate-900" />
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-20 rounded-lg bg-slate-900" />
+                    ))}
+                  </div>
+                </div>
               ) : contributors.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
                   {/* Pie Chart */}
@@ -950,9 +1101,15 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <p className="py-12 text-center text-slate-500">
-                  No contributor data available.
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-2xl text-emerald-400">
+                    👥
+                  </div>
+                  <p className="font-semibold text-slate-300">No Contributor Data Available</p>
+                  <p className="mt-1 max-w-sm text-xs text-slate-500">
+                    Run an analysis to inspect contributor distribution and commit shares.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -1027,29 +1184,35 @@ export default function Home() {
                   Repository Health Score
                 </p>
 
-                <div className="mt-7 flex flex-col items-center">
-                  <div className="flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-slate-700">
-                    <div className="text-center">
-                      <p className="text-4xl font-bold">
-                        {loading ? "..." : latest?.healthScore ?? "—"}
-                      </p>
-
-                      <p className="text-xs text-slate-500">
-                        out of 100
-                      </p>
-                    </div>
+                {loading ? (
+                  <div className="mt-7 flex flex-col items-center animate-pulse">
+                    <div className="flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-slate-800 bg-slate-900/60" />
+                    <div className="mt-5 h-4 w-24 rounded bg-slate-800" />
+                    <div className="mt-2 h-3 w-40 rounded bg-slate-800" />
                   </div>
+                ) : (
+                  <div className="mt-7 flex flex-col items-center">
+                    <div className="flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-slate-700">
+                      <div className="text-center">
+                        <p className="text-4xl font-bold">
+                          {latest?.healthScore ?? "—"}
+                        </p>
 
-                  <p className="mt-5 text-sm font-semibold text-slate-300">
-                    {loading
-                      ? "Loading analysis..."
-                      : latest?.healthRating ?? "No analysis yet"}
-                  </p>
+                        <p className="text-xs text-slate-500">
+                          out of 100
+                        </p>
+                      </div>
+                    </div>
 
-                  <p className="mt-2 text-center text-xs text-slate-500">
-                    Based on the latest saved analysis
-                  </p>
-                </div>
+                    <p className="mt-5 text-sm font-semibold text-slate-300">
+                      {latest?.healthRating ?? "No analysis yet"}
+                    </p>
+
+                    <p className="mt-2 text-center text-xs text-slate-500">
+                      Based on the latest saved analysis
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Repository Summary */}
@@ -1062,7 +1225,16 @@ export default function Home() {
                   Latest analysis information
                 </p>
 
-                {latest ? (
+                {loading ? (
+                  <div className="mt-7 grid animate-pulse gap-5 sm:grid-cols-2">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="h-16 rounded-lg bg-slate-900 p-3">
+                        <div className="h-3 w-20 rounded bg-slate-800" />
+                        <div className="mt-2 h-4 w-32 rounded bg-slate-800" />
+                      </div>
+                    ))}
+                  </div>
+                ) : latest ? (
                   <div className="mt-7 grid gap-5 sm:grid-cols-2">
                     <div>
                       <p className="text-xs text-slate-500">
@@ -1125,16 +1297,24 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-8 rounded-lg border border-dashed border-slate-700 p-7 text-center">
-                    <p className="font-medium text-slate-300">
-                      {loading
-                        ? "Loading repository data..."
-                        : "No analysis found"}
+                  <div className="mt-8 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700/80 p-8 text-center">
+                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-xl text-blue-400">
+                      ⚡
+                    </div>
+                    <p className="font-semibold text-slate-300">
+                      No Repository Analysis Found
                     </p>
-
-                    <p className="mt-2 text-xs text-slate-500">
-                      Run a repository analysis to see your metrics here.
+                    <p className="mt-1 max-w-sm text-xs text-slate-500">
+                      Execute a Git repository analysis to calculate health ratings, active committers, and stagnant file counts.
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => void runAnalysis()}
+                      disabled={analyzing}
+                      className="mt-4 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
+                    >
+                      ⚙ Analyze Repository Now
+                    </button>
                   </div>
                 )}
               </div>
@@ -1367,7 +1547,9 @@ export default function Home() {
                 </p>
               </div>
 
-              {healthTrendData.length > 0 ? (
+              {loading ? (
+                <div className="h-64 sm:h-72 w-full animate-pulse rounded-lg bg-slate-900" />
+              ) : healthTrendData.length > 0 ? (
                 <div className="h-64 sm:h-72 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={healthTrendData}>
@@ -1408,9 +1590,15 @@ export default function Home() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <p className="py-12 text-center text-slate-500">
-                  No health trend data available.
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-2xl text-blue-400">
+                    📈
+                  </div>
+                  <p className="font-semibold text-slate-300">No Trend History Available</p>
+                  <p className="mt-1 max-w-sm text-xs text-slate-500">
+                    Run subsequent repository analyses to track repository health score progression over time.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -2142,6 +2330,47 @@ export default function Home() {
           </div>
         </div>
       )}
+      {/* ── Toast Notifications (Success & Failure) ── */}
+      <div className="pointer-events-none fixed bottom-5 right-5 z-50 flex max-w-sm flex-col gap-2.5">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto flex items-start gap-3 rounded-xl border p-4 shadow-2xl backdrop-blur-md transition-all duration-300 ${
+              toast.type === "success"
+                ? "border-emerald-500/40 bg-[#0c1a18]/95 text-emerald-200"
+                : toast.type === "error"
+                ? "border-red-500/40 bg-[#1f0d14]/95 text-red-200"
+                : "border-blue-500/40 bg-[#0e1628]/95 text-blue-200"
+            }`}
+          >
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                toast.type === "success"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : toast.type === "error"
+                  ? "bg-red-500/20 text-red-400"
+                  : "bg-blue-500/20 text-blue-400"
+              }`}
+            >
+              {toast.type === "success" ? "✓" : toast.type === "error" ? "!" : "ℹ"}
+            </span>
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-white">{toast.title}</p>
+              {toast.message && (
+                <p className="mt-0.5 leading-relaxed text-slate-300">{toast.message}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => removeToast(toast.id)}
+              className="text-slate-400 transition hover:text-white"
+              aria-label="Close notification"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }
