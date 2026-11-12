@@ -129,7 +129,7 @@ export default function Home() {
   const [ratingFilter, setRatingFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "score-desc" | "score-asc">("date-desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(10);
 
   // Mobile navigation drawer
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -227,6 +227,15 @@ export default function Home() {
       }
 
       await loadDashboard(true);
+      setCurrentPage(1);
+      setSearchTerm("");
+      setRatingFilter("ALL");
+      setSortBy("date-desc");
+
+      if (data.analysisId) {
+        void openDetail(data.analysisId);
+      }
+
       addToast(
         "success",
         "Analysis Complete",
@@ -749,12 +758,23 @@ export default function Home() {
                 </p>
               </div>
 
-              <a
-                href="#history"
-                className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold transition hover:bg-blue-500 sm:px-4 sm:py-2.5 sm:text-sm"
-              >
-                View analysis history →
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                {latest && (
+                  <button
+                    type="button"
+                    onClick={() => void openDetail(latest.id)}
+                    className="rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:border-blue-500 hover:text-blue-400 sm:px-4 sm:py-2.5 sm:text-sm"
+                  >
+                    View Latest Details ({latest.totalCommits} commits)
+                  </button>
+                )}
+                <a
+                  href="#history"
+                  className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold transition hover:bg-blue-500 sm:px-4 sm:py-2.5 sm:text-sm"
+                >
+                  View analysis history →
+                </a>
+              </div>
             </div>
 
             {/* Backend Connection Error Banner with Retry Options */}
@@ -1952,18 +1972,32 @@ export default function Home() {
                       paginatedHistory.map((item) => (
                         <tr
                           key={item.id}
-                          className="cursor-pointer transition hover:bg-slate-800/40"
+                          className={`cursor-pointer transition hover:bg-slate-800/40 ${
+                            item.id === history[0]?.id ? "bg-blue-900/10 border-l-2 border-blue-500" : ""
+                          }`}
                           onClick={() => void openDetail(item.id)}
                         >
-                          <td className="max-w-48 truncate px-6 py-4 font-mono text-xs text-blue-400">
+                          <td className="max-w-48 truncate px-6 py-4 font-mono text-xs text-blue-400" title={item.id}>
                             {item.id}
                           </td>
 
-                          <td className="whitespace-nowrap px-6 py-4 text-slate-400">
-                            {new Date(item.analyzedAt).toLocaleDateString()}
+                          <td className="whitespace-nowrap px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-200 font-medium">
+                                {new Date(item.analyzedAt).toLocaleDateString()}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {new Date(item.analyzedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                              {item.id === history[0]?.id && (
+                                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                                  LATEST
+                                </span>
+                              )}
+                            </div>
                           </td>
 
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 font-semibold text-slate-200">
                             {item.totalCommits}
                           </td>
 
@@ -2156,7 +2190,20 @@ export default function Home() {
             {/* Panel Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#0e1528] px-4 py-4 sm:px-6 sm:py-5">
               <div>
-                <p className="text-xs text-slate-500">Analysis Details</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-slate-500">Analysis Details</p>
+                  {detailPanel && (
+                    detailPanel.id === history[0]?.id ? (
+                      <span className="rounded-full border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                        LATEST (CURRENT)
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                        HISTORICAL SNAPSHOT
+                      </span>
+                    )
+                  )}
+                </div>
                 <h2 className="mt-0.5 text-base font-bold sm:text-lg">
                   {detailPanel ? new Date(detailPanel.analyzedAt).toLocaleString() : "Loading..."}
                 </h2>
@@ -2215,6 +2262,29 @@ export default function Home() {
 
               {detailPanel && !detailLoading && (
                 <>
+                  {/* Historical Snapshot Notice */}
+                  {detailPanel.id !== history[0]?.id && history[0] && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-amber-300">
+                            🕒 Historical Analysis Snapshot
+                          </p>
+                          <p className="mt-0.5 text-slate-400">
+                            This record preserves repository stats from {new Date(detailPanel.analyzedAt).toLocaleDateString()} ({detailPanel.totalCommits} commits).
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void openDetail(history[0].id)}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
+                        >
+                          View Latest Analysis ({history[0].totalCommits} commits) →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Repository Metrics */}
                   <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-5">
                     <h3 className="mb-4 text-sm font-semibold text-slate-300">Repository Metrics</h3>
