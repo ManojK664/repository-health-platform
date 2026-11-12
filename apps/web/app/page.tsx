@@ -165,6 +165,71 @@ export default function Home() {
   const latest = history[0];
 
   // Export analysis history as CSV
+  // ── Risk helpers ──────────────────────────────────────────────────────────
+
+  type RiskLevel = "Critical" | "High" | "Medium" | "Low";
+
+  const getRiskLevel = (score: number): RiskLevel => {
+    if (score >= 80) return "Low";
+    if (score >= 60) return "Medium";
+    if (score >= 40) return "High";
+    return "Critical";
+  };
+
+  const RISK_META: Record<RiskLevel, { color: string; bg: string; border: string; dot: string }> = {
+    Critical: { color: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/40",    dot: "bg-red-400"    },
+    High:     { color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/40", dot: "bg-orange-400" },
+    Medium:   { color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/40", dot: "bg-yellow-400" },
+    Low:      { color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/40",dot: "bg-emerald-400"},
+  };
+
+  // Bus-factor risk: 1 = Critical, 2 = High, 3 = Medium, 4+ = Low
+  const getBusFactorRisk = (bf: number): RiskLevel => {
+    if (bf <= 1) return "Critical";
+    if (bf === 2) return "High";
+    if (bf === 3) return "Medium";
+    return "Low";
+  };
+
+  // Stagnant-file risk based on % of total files stagnant
+  const getStagnantRisk = (stagnant: number, total: number): RiskLevel => {
+    if (total === 0) return "Low";
+    const pct = (stagnant / total) * 100;
+    if (pct >= 60) return "Critical";
+    if (pct >= 40) return "High";
+    if (pct >= 20) return "Medium";
+    return "Low";
+  };
+
+  // Contributor concentration risk based on top-contributor share
+  const getConcentrationRisk = (topPct: number): RiskLevel => {
+    if (topPct >= 80) return "Critical";
+    if (topPct >= 60) return "High";
+    if (topPct >= 40) return "Medium";
+    return "Low";
+  };
+
+  // Derive risk values from latest analysis
+  const healthRisk     = latest ? getRiskLevel(latest.healthScore) : ("Low" as RiskLevel);
+  const busFactorRisk  = latest ? getBusFactorRisk(latest.estimatedBusFactor) : ("Low" as RiskLevel);
+  const stagnantRisk   = latest ? getStagnantRisk(latest.stagnantFiles, latest.totalFiles) : ("Low" as RiskLevel);
+  const topContribPct  = contributors[0]?.percentage ?? 0;
+  const concentrationRisk = getConcentrationRisk(topContribPct);
+
+  // Overall risk = worst of all individual risks
+  const riskOrder: RiskLevel[] = ["Critical", "High", "Medium", "Low"];
+  const overallRisk: RiskLevel = [healthRisk, busFactorRisk, stagnantRisk, concentrationRisk]
+    .sort((a, b) => riskOrder.indexOf(a) - riskOrder.indexOf(b))[0];
+
+  // Risk category counts (for summary badges)
+  const riskItems: RiskLevel[] = [healthRisk, busFactorRisk, stagnantRisk, concentrationRisk];
+  const riskCounts = riskOrder.reduce<Record<RiskLevel, number>>((acc, r) => {
+    acc[r] = riskItems.filter((x) => x === r).length;
+    return acc;
+  }, { Critical: 0, High: 0, Medium: 0, Low: 0 });
+
+  // ── CSV export ────────────────────────────────────────────────────────────
+
   const exportCSV = () => {
     const headers = [
       "Analysis ID",
@@ -350,6 +415,14 @@ export default function Home() {
             >
               <span>⇄</span>
               Analysis Comparison
+            </a>
+
+            <a
+              href="#risk"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            >
+              <span>⚠</span>
+              Risk Visualization
             </a>
 
             <a
@@ -883,6 +956,221 @@ export default function Home() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* ── Advanced Repository Risk Visualization ── */}
+            <div id="risk" className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">Repository Risk Visualization</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Risk severity across key repository health indicators
+                  </p>
+                </div>
+
+                {/* Overall risk badge */}
+                {latest && (
+                  <span
+                    className={`rounded-lg border px-4 py-1.5 text-sm font-semibold ${RISK_META[overallRisk].color} ${RISK_META[overallRisk].bg} ${RISK_META[overallRisk].border}`}
+                  >
+                    Overall Risk: {overallRisk}
+                  </span>
+                )}
+              </div>
+
+              {latest ? (
+                <>
+                  {/* Risk Summary Badges */}
+                  <div className="mb-6 flex flex-wrap gap-3">
+                    {riskOrder.map((level) => (
+                      <div
+                        key={level}
+                        className={`flex items-center gap-2 rounded-lg border px-4 py-2 ${RISK_META[level].bg} ${RISK_META[level].border}`}
+                      >
+                        <span className={`h-2.5 w-2.5 rounded-full ${RISK_META[level].dot}`} />
+                        <span className={`text-sm font-semibold ${RISK_META[level].color}`}>
+                          {level}
+                        </span>
+                        <span className="ml-1 text-sm text-slate-400">
+                          {riskCounts[level]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Risk Indicator Cards */}
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+                    {/* Health Score Risk */}
+                    {(() => {
+                      const meta = RISK_META[healthRisk];
+                      return (
+                        <div className={`rounded-xl border p-5 ${meta.bg} ${meta.border}`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-400">Health Score</p>
+                            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${meta.color} ${meta.bg}`}>
+                              {healthRisk}
+                            </span>
+                          </div>
+                          <p className={`mt-4 text-3xl font-bold ${meta.color}`}>
+                            {latest.healthScore}/100
+                          </p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                            <div
+                              className={`h-full rounded-full ${meta.dot}`}
+                              style={{ width: `${latest.healthScore}%` }}
+                            />
+                          </div>
+                          <p className="mt-3 text-xs text-slate-500">
+                            {healthRisk === "Critical" && "Immediate attention required"}
+                            {healthRisk === "High"     && "Significant issues detected"}
+                            {healthRisk === "Medium"   && "Some areas need improvement"}
+                            {healthRisk === "Low"      && "Repository is healthy"}
+                          </p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Contributor Concentration Risk */}
+                    {(() => {
+                      const meta = RISK_META[concentrationRisk];
+                      return (
+                        <div className={`rounded-xl border p-5 ${meta.bg} ${meta.border}`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-400">Contributor Concentration</p>
+                            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${meta.color} ${meta.bg}`}>
+                              {concentrationRisk}
+                            </span>
+                          </div>
+                          <p className={`mt-4 text-3xl font-bold ${meta.color}`}>
+                            {topContribPct.toFixed(1)}%
+                          </p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                            <div
+                              className={`h-full rounded-full ${meta.dot}`}
+                              style={{ width: `${Math.min(100, topContribPct)}%` }}
+                            />
+                          </div>
+                          <p className="mt-3 text-xs text-slate-500">
+                            Top contributor share · {latest.contributorCount} total contributor{latest.contributorCount !== 1 ? "s" : ""}
+                          </p>
+                          <p className={`mt-1 text-xs font-medium ${meta.color}`}>
+                            {concentrationRisk === "Critical" && "Extreme single-contributor dependency"}
+                            {concentrationRisk === "High"     && "High knowledge concentration"}
+                            {concentrationRisk === "Medium"   && "Moderate concentration risk"}
+                            {concentrationRisk === "Low"      && "Well-distributed contributions"}
+                          </p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Bus Factor Risk */}
+                    {(() => {
+                      const meta = RISK_META[busFactorRisk];
+                      return (
+                        <div className={`rounded-xl border p-5 ${meta.bg} ${meta.border}`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-400">Bus Factor</p>
+                            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${meta.color} ${meta.bg}`}>
+                              {busFactorRisk}
+                            </span>
+                          </div>
+                          <p className={`mt-4 text-3xl font-bold ${meta.color}`}>
+                            {latest.estimatedBusFactor}
+                          </p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                            <div
+                              className={`h-full rounded-full ${meta.dot}`}
+                              style={{ width: `${Math.min(100, latest.estimatedBusFactor * 25)}%` }}
+                            />
+                          </div>
+                          <p className="mt-3 text-xs text-slate-500">
+                            Key contributors for 50% of commits
+                          </p>
+                          <p className={`mt-1 text-xs font-medium ${meta.color}`}>
+                            {busFactorRisk === "Critical" && "1 person is a single point of failure"}
+                            {busFactorRisk === "High"     && "Very few key contributors"}
+                            {busFactorRisk === "Medium"   && "Moderate bus factor risk"}
+                            {busFactorRisk === "Low"      && "Good contributor spread"}
+                          </p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Stagnant Files Risk */}
+                    {(() => {
+                      const meta = RISK_META[stagnantRisk];
+                      const stagnantPct = latest.totalFiles > 0
+                        ? ((latest.stagnantFiles / latest.totalFiles) * 100).toFixed(1)
+                        : "0.0";
+                      return (
+                        <div className={`rounded-xl border p-5 ${meta.bg} ${meta.border}`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-400">Stagnant Files</p>
+                            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${meta.color} ${meta.bg}`}>
+                              {stagnantRisk}
+                            </span>
+                          </div>
+                          <p className={`mt-4 text-3xl font-bold ${meta.color}`}>
+                            {latest.stagnantFiles}
+                            <span className="ml-2 text-base font-normal text-slate-500">
+                              / {latest.totalFiles}
+                            </span>
+                          </p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                            <div
+                              className={`h-full rounded-full ${meta.dot}`}
+                              style={{ width: `${stagnantPct}%` }}
+                            />
+                          </div>
+                          <p className="mt-3 text-xs text-slate-500">
+                            {stagnantPct}% of files unchanged &gt; 30 days
+                          </p>
+                          <p className={`mt-1 text-xs font-medium ${meta.color}`}>
+                            {stagnantRisk === "Critical" && "Majority of files are stagnant"}
+                            {stagnantRisk === "High"     && "Large portion of files stagnant"}
+                            {stagnantRisk === "Medium"   && "Noticeable stagnation present"}
+                            {stagnantRisk === "Low"      && "Files are actively maintained"}
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Risk Category Summary Table */}
+                  <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
+                    <div className="border-b border-slate-800 bg-slate-900/60 px-5 py-4">
+                      <h4 className="text-sm font-semibold text-slate-300">Risk Category Summary</h4>
+                    </div>
+                    <div className="divide-y divide-slate-800">
+                      {[
+                        { label: "Overall Repository Health", risk: healthRisk,         value: `${latest.healthScore}/100` },
+                        { label: "Contributor Concentration", risk: concentrationRisk,   value: `${topContribPct.toFixed(1)}% top contributor` },
+                        { label: "Bus Factor",                risk: busFactorRisk,       value: `${latest.estimatedBusFactor} key contributor${latest.estimatedBusFactor !== 1 ? "s" : ""}` },
+                        { label: "Stagnant File Rate",        risk: stagnantRisk,        value: `${latest.stagnantFiles} of ${latest.totalFiles} files` },
+                      ].map((row) => {
+                        const meta = RISK_META[row.risk];
+                        return (
+                          <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                            <span className="text-sm text-slate-300">{row.label}</span>
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm text-slate-500">{row.value}</span>
+                              <span className={`flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-semibold ${meta.color} ${meta.bg} ${meta.border}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+                                {row.risk}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="py-12 text-center text-slate-500">
+                  {loading ? "Loading risk data..." : "No analysis data available."}
+                </p>
+              )}
             </div>
 
             {/* Repository Health Trend */}
