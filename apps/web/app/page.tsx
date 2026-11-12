@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   BarChart,
@@ -97,6 +97,13 @@ export default function Home() {
   const [detailPanel, setDetailPanel] = useState<AnalysisDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+
+  // Analysis History Controls: Search, Filter, Sort, Pagination
+  const [searchTerm, setSearchTerm] = useState("");
+  const [ratingFilter, setRatingFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "score-desc" | "score-asc">("date-desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   // Load dashboard data from the backend API
   // Manual refresh updates data without reloading the browser page.
@@ -341,6 +348,63 @@ export default function Home() {
     link.click();
     URL.revokeObjectURL(url);
   };
+
+  // Filter and sort analysis history
+  const filteredHistory = useMemo(() => {
+    return history
+      .filter((item) => {
+        // Filter by health rating
+        if (
+          ratingFilter !== "ALL" &&
+          item.healthRating.toLowerCase() !== ratingFilter.toLowerCase()
+        ) {
+          return false;
+        }
+
+        // Search by ID, date, or rating
+        if (searchTerm.trim()) {
+          const term = searchTerm.trim().toLowerCase();
+          const matchId = item.id.toLowerCase().includes(term);
+          const matchDate = new Date(item.analyzedAt)
+            .toLocaleDateString()
+            .toLowerCase()
+            .includes(term);
+          const matchRating = item.healthRating.toLowerCase().includes(term);
+          if (!matchId && !matchDate && !matchRating) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === "date-desc") {
+          return new Date(b.analyzedAt).getTime() - new Date(a.analyzedAt).getTime();
+        }
+        if (sortBy === "date-asc") {
+          return new Date(a.analyzedAt).getTime() - new Date(b.analyzedAt).getTime();
+        }
+        if (sortBy === "score-desc") {
+          return b.healthScore - a.healthScore;
+        }
+        if (sortBy === "score-asc") {
+          return a.healthScore - b.healthScore;
+        }
+        return 0;
+      });
+  }, [history, ratingFilter, searchTerm, sortBy]);
+
+  // Reset to first page whenever filter, search, sort or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, ratingFilter, sortBy, pageSize]);
+
+  // Pagination calculation
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / pageSize));
+  const paginatedHistory = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredHistory.slice(start, start + pageSize);
+  }, [filteredHistory, currentPage, pageSize]);
 
   // Repository health score trend
   const healthTrendData = [...history]
@@ -1458,11 +1522,11 @@ export default function Home() {
                   </h3>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Previously saved repository analyses
+                    Search, filter, sort and inspect saved repository analyses
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={exportCSV}
@@ -1474,8 +1538,114 @@ export default function Home() {
                   </button>
 
                   <span className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-400">
-                    {history.length} records
+                    {filteredHistory.length === history.length
+                      ? `${history.length} records`
+                      : `${filteredHistory.length} of ${history.length} filtered`}
                   </span>
+                </div>
+              </div>
+
+              {/* Controls Toolbar: Search, Filter, Sort */}
+              <div className="border-b border-slate-800 bg-slate-900/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-1 flex-wrap items-center gap-3 min-w-[280px]">
+                    {/* Search Input */}
+                    <div className="relative flex-1 min-w-[200px]">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                        🔍
+                      </span>
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by ID, date, rating..."
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 py-2 pl-9 pr-8 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-blue-500"
+                      />
+                      {searchTerm && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchTerm("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-slate-300"
+                          title="Clear search"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter by Health Rating */}
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="filter-rating" className="text-xs text-slate-400 whitespace-nowrap">
+                        Rating:
+                      </label>
+                      <select
+                        id="filter-rating"
+                        value={ratingFilter}
+                        onChange={(e) => setRatingFilter(e.target.value)}
+                        className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-blue-500"
+                      >
+                        <option value="ALL">All Ratings</option>
+                        <option value="Healthy">Healthy</option>
+                        <option value="Moderate">Moderate</option>
+                        <option value="At Risk">At Risk</option>
+                      </select>
+                    </div>
+
+                    {/* Sort Selector */}
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="sort-by" className="text-xs text-slate-400 whitespace-nowrap">
+                        Sort by:
+                      </label>
+                      <select
+                        id="sort-by"
+                        value={sortBy}
+                        onChange={(e) =>
+                          setSortBy(
+                            e.target.value as
+                              | "date-desc"
+                              | "date-asc"
+                              | "score-desc"
+                              | "score-asc"
+                          )
+                        }
+                        className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-blue-500"
+                      >
+                        <option value="date-desc">Date (Newest first)</option>
+                        <option value="date-asc">Date (Oldest first)</option>
+                        <option value="score-desc">Health Score (Highest)</option>
+                        <option value="score-asc">Health Score (Lowest)</option>
+                      </select>
+                    </div>
+
+                    {/* Reset Filters button */}
+                    {(searchTerm !== "" || ratingFilter !== "ALL" || sortBy !== "date-desc") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setRatingFilter("ALL");
+                          setSortBy("date-desc");
+                        }}
+                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 transition hover:border-slate-500 hover:text-white"
+                      >
+                        Reset filters
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Page Size Selector */}
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <span>Show:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 outline-none transition focus:border-blue-500"
+                    >
+                      <option value={5}>5 per page</option>
+                      <option value={10}>10 per page</option>
+                      <option value={20}>20 per page</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1496,69 +1666,227 @@ export default function Home() {
                   </thead>
 
                   <tbody className="divide-y divide-slate-800">
-                    {history.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="cursor-pointer transition hover:bg-slate-800/40"
-                        onClick={() => void openDetail(item.id)}
-                      >
-                        <td className="max-w-48 truncate px-6 py-4 text-blue-400">
-                          {item.id}
-                        </td>
+                    {/* Loading Skeleton State */}
+                    {loading && (
+                      <>
+                        {[1, 2, 3].map((skeleton) => (
+                          <tr key={skeleton} className="animate-pulse">
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-32 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-20 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-12 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-14 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-14 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-16 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-16 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-20 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-6 w-14 rounded bg-slate-800" />
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
 
-                        <td className="whitespace-nowrap px-6 py-4 text-slate-400">
-                          {new Date(item.analyzedAt).toLocaleDateString()}
-                        </td>
+                    {/* Populated Data Rows */}
+                    {!loading &&
+                      paginatedHistory.map((item) => (
+                        <tr
+                          key={item.id}
+                          className="cursor-pointer transition hover:bg-slate-800/40"
+                          onClick={() => void openDetail(item.id)}
+                        >
+                          <td className="max-w-48 truncate px-6 py-4 font-mono text-xs text-blue-400">
+                            {item.id}
+                          </td>
 
-                        <td className="px-6 py-4">
-                          {item.totalCommits}
-                        </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-slate-400">
+                            {new Date(item.analyzedAt).toLocaleDateString()}
+                          </td>
 
-                        <td className="px-6 py-4 text-emerald-400">
-                          {item.totalAdditions.toLocaleString()}
-                        </td>
+                          <td className="px-6 py-4">
+                            {item.totalCommits}
+                          </td>
 
-                        <td className="px-6 py-4 text-red-400">
-                          {item.totalDeletions.toLocaleString()}
-                        </td>
+                          <td className="px-6 py-4 text-emerald-400">
+                            {item.totalAdditions.toLocaleString()}
+                          </td>
 
-                        <td className="px-6 py-4 text-blue-400">
-                          {item.totalChurn.toLocaleString()}
-                        </td>
+                          <td className="px-6 py-4 text-red-400">
+                            {item.totalDeletions.toLocaleString()}
+                          </td>
 
-                        <td className="px-6 py-4 font-semibold">
-                          {item.healthScore}/100
-                        </td>
+                          <td className="px-6 py-4 text-blue-400">
+                            {item.totalChurn.toLocaleString()}
+                          </td>
 
-                        <td className="px-6 py-4 text-slate-300">
-                          {item.healthRating}
-                        </td>
+                          <td className="px-6 py-4 font-semibold">
+                            {item.healthScore}/100
+                          </td>
 
-                        <td className="px-6 py-4">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); void openDetail(item.id); }}
-                            className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-400 transition hover:border-blue-500 hover:text-blue-400"
-                          >
-                            View →
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-6 py-4">
+                            <span
+                              className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                                item.healthRating === "Healthy"
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                  : item.healthRating === "Moderate"
+                                  ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30"
+                                  : "bg-red-500/10 text-red-400 border border-red-500/30"
+                              }`}
+                            >
+                              {item.healthRating}
+                            </span>
+                          </td>
 
+                          <td className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openDetail(item.id);
+                              }}
+                              className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-400 transition hover:border-blue-500 hover:text-blue-400"
+                            >
+                              View →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+
+                    {/* Empty State: 0 total records */}
                     {!loading && history.length === 0 && (
                       <tr>
                         <td
                           colSpan={9}
-                          className="px-6 py-8 text-center text-slate-500"
+                          className="px-6 py-12 text-center"
                         >
-                          No saved analysis records available.
+                          <div className="mx-auto flex max-w-sm flex-col items-center">
+                            <span className="text-3xl text-slate-600">◷</span>
+                            <p className="mt-3 font-medium text-slate-300">
+                              No saved analysis records available
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Run a repository analysis to start tracking repository health metrics over time.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => void runAnalysis()}
+                              disabled={analyzing}
+                              className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500"
+                            >
+                              ⚙ Run Analysis Now
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Empty State: Filter yielded 0 results */}
+                    {!loading && history.length > 0 && filteredHistory.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={9}
+                          className="px-6 py-12 text-center"
+                        >
+                          <div className="mx-auto flex max-w-sm flex-col items-center">
+                            <span className="text-2xl text-slate-600">🔍</span>
+                            <p className="mt-2 font-medium text-slate-300">
+                              No matching analysis records
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              No records found matching your active search or filter criteria.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSearchTerm("");
+                                setRatingFilter("ALL");
+                                setSortBy("date-desc");
+                              }}
+                              className="mt-3 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-blue-500 hover:text-blue-400"
+                            >
+                              Clear all filters
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {!loading && filteredHistory.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-slate-900/30 px-6 py-4 text-xs text-slate-400">
+                  <div>
+                    Showing{" "}
+                    <span className="font-semibold text-slate-200">
+                      {(currentPage - 1) * pageSize + 1}
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-semibold text-slate-200">
+                      {Math.min(currentPage * pageSize, filteredHistory.length)}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-slate-200">
+                      {filteredHistory.length}
+                    </span>{" "}
+                    records
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-blue-500 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ← Previous
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
+                            currentPage === pageNum
+                              ? "bg-blue-600 text-white"
+                              : "border border-slate-700 text-slate-400 hover:border-slate-500 hover:text-white"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-blue-500 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
