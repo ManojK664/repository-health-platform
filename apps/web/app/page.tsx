@@ -43,6 +43,30 @@ type Contributor = {
   percentage: number;
 };
 
+type Commit = {
+  hash: string;
+  authorName: string;
+  authorEmail: string;
+  date: string;
+  message: string;
+  additions: number;
+  deletions: number;
+  churn: number;
+};
+
+type ScoreBreakdown = {
+  activity: number;
+  collaboration: number;
+  knowledge: number;
+  maintenance: number;
+};
+
+type AnalysisDetail = Analysis & {
+  scoreBreakdown: ScoreBreakdown;
+  contributors: Contributor[];
+  commits: Commit[];
+};
+
 type HistoryResponse = {
   success: boolean;
   count: number;
@@ -68,6 +92,11 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
   const [comparisonId, setComparisonId] = useState("");
+
+  // Individual analysis detail panel
+  const [detailPanel, setDetailPanel] = useState<AnalysisDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
   // Load dashboard data from the backend API
   // Manual refresh updates data without reloading the browser page.
@@ -159,6 +188,39 @@ export default function Home() {
       );
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  // Open individual analysis detail panel
+  const openDetail = async (id: string) => {
+    try {
+      setDetailLoading(true);
+      setDetailError("");
+      setDetailPanel(null);
+
+      const response = await fetch(`${API_URL}/history/${id}`);
+
+      if (!response.ok) throw new Error("Failed to load analysis details.");
+
+      const data = await response.json();
+
+      if (!data.success) throw new Error(data.message ?? "Failed to load details.");
+
+      setDetailPanel(data.analysis as AnalysisDetail);
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : "Failed to load details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Navigate to previous / next analysis in the detail panel
+  const navigateDetail = (direction: "prev" | "next") => {
+    if (!detailPanel) return;
+    const idx = history.findIndex((h) => h.id === detailPanel.id);
+    const nextIdx = direction === "next" ? idx + 1 : idx - 1;
+    if (nextIdx >= 0 && nextIdx < history.length) {
+      void openDetail(history[nextIdx].id);
     }
   };
 
@@ -1429,6 +1491,7 @@ export default function Home() {
                       <th className="px-6 py-4 font-medium">Code Churn</th>
                       <th className="px-6 py-4 font-medium">Health Score</th>
                       <th className="px-6 py-4 font-medium">Rating</th>
+                      <th className="px-6 py-4 font-medium"></th>
                     </tr>
                   </thead>
 
@@ -1436,7 +1499,8 @@ export default function Home() {
                     {history.map((item) => (
                       <tr
                         key={item.id}
-                        className="transition hover:bg-slate-800/40"
+                        className="cursor-pointer transition hover:bg-slate-800/40"
+                        onClick={() => void openDetail(item.id)}
                       >
                         <td className="max-w-48 truncate px-6 py-4 text-blue-400">
                           {item.id}
@@ -1469,13 +1533,23 @@ export default function Home() {
                         <td className="px-6 py-4 text-slate-300">
                           {item.healthRating}
                         </td>
+
+                        <td className="px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void openDetail(item.id); }}
+                            className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-400 transition hover:border-blue-500 hover:text-blue-400"
+                          >
+                            View →
+                          </button>
+                        </td>
                       </tr>
                     ))}
 
                     {!loading && history.length === 0 && (
                       <tr>
                         <td
-                          colSpan={8}
+                          colSpan={9}
                           className="px-6 py-8 text-center text-slate-500"
                         >
                           No saved analysis records available.
@@ -1494,6 +1568,196 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      {/* ── Individual Analysis Detail Panel (slide-in overlay) ── */}
+      {(detailPanel ?? detailLoading) && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => { setDetailPanel(null); setDetailError(""); }}
+          />
+
+          {/* Panel */}
+          <div className="relative z-10 flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-[#0e1528] shadow-2xl">
+
+            {/* Panel Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#0e1528] px-6 py-5">
+              <div>
+                <p className="text-xs text-slate-500">Analysis Details</p>
+                <h2 className="mt-0.5 text-lg font-bold">
+                  {detailPanel ? new Date(detailPanel.analyzedAt).toLocaleString() : "Loading..."}
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Prev / Next navigation */}
+                {detailPanel && (() => {
+                  const idx = history.findIndex((h) => h.id === detailPanel.id);
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => navigateDetail("prev")}
+                        disabled={idx <= 0}
+                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 transition hover:border-blue-500 hover:text-blue-400 disabled:opacity-30"
+                        title="Newer analysis"
+                      >
+                        ← Prev
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateDetail("next")}
+                        disabled={idx >= history.length - 1}
+                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 transition hover:border-blue-500 hover:text-blue-400 disabled:opacity-30"
+                        title="Older analysis"
+                      >
+                        Next →
+                      </button>
+                    </>
+                  );
+                })()}
+
+                <button
+                  type="button"
+                  onClick={() => { setDetailPanel(null); setDetailError(""); }}
+                  className="ml-2 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 transition hover:border-red-500 hover:text-red-400"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Panel Body */}
+            <div className="flex-1 space-y-6 p-6">
+
+              {detailLoading && (
+                <p className="py-20 text-center text-slate-500">Loading analysis details...</p>
+              )}
+
+              {detailError && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                  {detailError}
+                </div>
+              )}
+
+              {detailPanel && !detailLoading && (
+                <>
+                  {/* Repository Metrics */}
+                  <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-5">
+                    <h3 className="mb-4 text-sm font-semibold text-slate-300">Repository Metrics</h3>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      {[
+                        { label: "Total Commits",   value: detailPanel.totalCommits.toLocaleString(),    color: "text-blue-400" },
+                        { label: "Active Days",      value: detailPanel.activeDays.toLocaleString(),      color: "text-purple-400" },
+                        { label: "Contributors",     value: detailPanel.contributorCount.toLocaleString(), color: "text-emerald-400" },
+                        { label: "Total Files",      value: detailPanel.totalFiles.toLocaleString(),      color: "text-orange-400" },
+                        { label: "Lines Added",      value: detailPanel.totalAdditions.toLocaleString(),  color: "text-emerald-400" },
+                        { label: "Lines Deleted",    value: detailPanel.totalDeletions.toLocaleString(),  color: "text-red-400" },
+                        { label: "Code Churn",       value: detailPanel.totalChurn.toLocaleString(),      color: "text-blue-400" },
+                        { label: "Bus Factor",       value: String(detailPanel.estimatedBusFactor),       color: "text-orange-400" },
+                        { label: "Stagnant Files",   value: String(detailPanel.stagnantFiles),            color: "text-red-400" },
+                      ].map((m) => (
+                        <div key={m.label} className="rounded-lg bg-slate-900 p-3">
+                          <p className="text-xs text-slate-500">{m.label}</p>
+                          <p className={`mt-1.5 text-lg font-bold ${m.color}`}>{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Health Score Breakdown */}
+                  <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-5">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-300">Health Score Breakdown</h3>
+                      <span className="rounded-lg bg-blue-500/10 px-3 py-1 text-sm font-bold text-blue-400">
+                        {detailPanel.healthScore}/100 · {detailPanel.healthRating}
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: "Activity",      value: detailPanel.scoreBreakdown.activity,      max: 25, color: "bg-purple-400" },
+                        { label: "Collaboration", value: detailPanel.scoreBreakdown.collaboration, max: 25, color: "bg-blue-400" },
+                        { label: "Knowledge",     value: detailPanel.scoreBreakdown.knowledge,     max: 25, color: "bg-emerald-400" },
+                        { label: "Maintenance",   value: detailPanel.scoreBreakdown.maintenance,   max: 25, color: "bg-orange-400" },
+                      ].map((s) => (
+                        <div key={s.label}>
+                          <div className="mb-1.5 flex justify-between text-xs">
+                            <span className="text-slate-400">{s.label}</span>
+                            <span className="font-semibold text-slate-200">{s.value}/{s.max}</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                            <div
+                              className={`h-full rounded-full ${s.color}`}
+                              style={{ width: `${(s.value / s.max) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Contributors */}
+                  {detailPanel.contributors.length > 0 && (
+                    <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-5">
+                      <h3 className="mb-4 text-sm font-semibold text-slate-300">
+                        Contributors ({detailPanel.contributors.length})
+                      </h3>
+                      <div className="space-y-3">
+                        {detailPanel.contributors.map((c, i) => (
+                          <div key={`${c.author}-${i}`} className="rounded-lg bg-slate-900 p-3">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium text-slate-200">{c.author}</span>
+                              <span className="font-semibold text-blue-400">{c.percentage.toFixed(1)}%</span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">{c.commits} commits</p>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-700">
+                              <div
+                                className="h-full rounded-full bg-blue-500"
+                                style={{ width: `${Math.min(100, c.percentage)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Commits */}
+                  {detailPanel.commits.length > 0 && (
+                    <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-5">
+                      <h3 className="mb-4 text-sm font-semibold text-slate-300">
+                        Commits ({detailPanel.commits.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {detailPanel.commits.slice(0, 20).map((c) => (
+                          <div key={c.hash} className="rounded-lg bg-slate-900 p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <p className="text-sm text-slate-200 leading-snug">{c.message}</p>
+                              <span className="shrink-0 font-mono text-xs text-slate-500">{c.hash.slice(0, 7)}</span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                              <span>{c.authorName}</span>
+                              <span>{new Date(c.date).toLocaleDateString()}</span>
+                              <span className="text-emerald-400">+{c.additions}</span>
+                              <span className="text-red-400">-{c.deletions}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {detailPanel.commits.length > 20 && (
+                          <p className="pt-1 text-center text-xs text-slate-600">
+                            Showing 20 of {detailPanel.commits.length} commits
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
