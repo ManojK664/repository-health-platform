@@ -65,6 +65,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState("");
   const [comparisonId, setComparisonId] = useState("");
 
   // Load dashboard data from the backend API
@@ -131,6 +133,34 @@ export default function Home() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  // Trigger a new repository analysis and refresh the dashboard
+  const runAnalysis = async () => {
+    try {
+      setAnalyzing(true);
+      setAnalyzeError("");
+
+      const response = await fetch(`${API_URL}/analyze`);
+
+      if (!response.ok) {
+        throw new Error("Analysis request failed.");
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message ?? "Analysis failed.");
+      }
+
+      await loadDashboard(true);
+    } catch (err) {
+      setAnalyzeError(
+        err instanceof Error ? err.message : "Analysis failed."
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const latest = history[0];
 
@@ -366,6 +396,18 @@ export default function Home() {
                 Local Analysis
               </span>
 
+              {/* Run Analysis Button */}
+              <button
+                type="button"
+                onClick={() => void runAnalysis()}
+                disabled={analyzing || loading}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Run a new repository analysis"
+              >
+                <span className={analyzing ? "animate-spin" : ""}>⚙</span>
+                {analyzing ? "Analyzing..." : "Run Analysis"}
+              </button>
+
               {/* Dashboard Refresh Button */}
               <button
                 type="button"
@@ -424,6 +466,13 @@ export default function Home() {
               <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
                 {error}
                 {" "}Make sure your backend is running on port 5000.
+              </div>
+            )}
+
+            {/* Analysis Error */}
+            {analyzeError && (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                Analysis failed: {analyzeError}
               </div>
             )}
 
