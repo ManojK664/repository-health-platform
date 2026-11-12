@@ -134,6 +134,57 @@ export default function Home() {
 
   const latest = history[0];
 
+  // Export analysis history as CSV
+  const exportCSV = () => {
+    const headers = [
+      "Analysis ID",
+      "Date",
+      "Total Commits",
+      "Active Days",
+      "Contributors",
+      "Total Files",
+      "Lines Added",
+      "Lines Deleted",
+      "Code Churn",
+      "Bus Factor",
+      "Stagnant Files",
+      "Health Score",
+      "Health Rating",
+    ];
+
+    const rows = history.map((item) => [
+      item.id,
+      new Date(item.analyzedAt).toLocaleString(),
+      item.totalCommits,
+      item.activeDays,
+      item.contributorCount,
+      item.totalFiles,
+      item.totalAdditions,
+      item.totalDeletions,
+      item.totalChurn,
+      item.estimatedBusFactor,
+      item.stagnantFiles,
+      item.healthScore,
+      item.healthRating,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `repo-health-analysis-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Repository health score trend
   const healthTrendData = [...history]
     .reverse()
@@ -1012,9 +1063,21 @@ export default function Home() {
                   </p>
                 </div>
 
-                <span className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-400">
-                  {history.length} records
-                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={exportCSV}
+                    disabled={history.length === 0}
+                    className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Export analysis history as CSV"
+                  >
+                    ⬇ Export CSV
+                  </button>
+
+                  <span className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-400">
+                    {history.length} records
+                  </span>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
