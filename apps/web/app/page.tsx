@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -63,6 +65,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [comparisonId, setComparisonId] = useState("");
 
   // Load dashboard data from the backend API
   // Manual refresh updates data without reloading the browser page.
@@ -131,6 +134,49 @@ export default function Home() {
 
   const latest = history[0];
 
+  // Repository health score trend
+  const healthTrendData = [...history]
+    .reverse()
+    .map((item) => ({
+      date: new Date(item.analyzedAt).toLocaleDateString(),
+      healthScore: item.healthScore,
+    }));
+
+  // Previous analysis selected for comparison
+  const previousAnalysis =
+    history.find((item) => item.id === comparisonId) ?? history[1];
+
+  // Calculate differences between latest and previous analysis
+  const comparisonMetrics =
+    previousAnalysis && latest
+      ? [
+          {
+            label: "Health Score",
+            current: latest.healthScore,
+            previous: previousAnalysis.healthScore,
+            difference: latest.healthScore - previousAnalysis.healthScore,
+          },
+          {
+            label: "Code Churn",
+            current: latest.totalChurn,
+            previous: previousAnalysis.totalChurn,
+            difference: latest.totalChurn - previousAnalysis.totalChurn,
+          },
+          {
+            label: "Total Commits",
+            current: latest.totalCommits,
+            previous: previousAnalysis.totalCommits,
+            difference: latest.totalCommits - previousAnalysis.totalCommits,
+          },
+          {
+            label: "Stagnant Files",
+            current: latest.stagnantFiles,
+            previous: previousAnalysis.stagnantFiles,
+            difference: latest.stagnantFiles - previousAnalysis.stagnantFiles,
+          },
+        ]
+      : [];
+
   // Code churn chart data
   const codeChangesData = latest
     ? [
@@ -176,7 +222,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#0b1020] text-slate-100">
       <div className="flex min-h-screen">
-
         {/* Sidebar */}
         <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-[#0e1528] p-6 md:flex md:flex-col">
           <div className="mb-10">
@@ -219,6 +264,14 @@ export default function Home() {
             </a>
 
             <a
+              href="#comparison"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            >
+              <span>⇄</span>
+              Analysis Comparison
+            </a>
+
+            <a
               href="#history"
               className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
             >
@@ -245,7 +298,6 @@ export default function Home() {
 
         {/* Main Content */}
         <section className="min-w-0 flex-1">
-
           {/* Header */}
           <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 bg-[#0e1528] px-5 py-5 md:px-9">
             <div>
@@ -292,7 +344,6 @@ export default function Home() {
             id="overview"
             className="space-y-7 p-5 md:p-9"
           >
-
             {/* Page Heading */}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -470,7 +521,6 @@ export default function Home() {
                 </p>
               ) : contributors.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
-
                   {/* Pie Chart */}
                   <div className="h-72 min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
@@ -553,7 +603,6 @@ export default function Home() {
 
             {/* Repository Risk Analysis */}
             <div className="grid gap-5 md:grid-cols-2">
-
               {/* Bus Factor */}
               <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
                 <div className="flex items-center justify-between">
@@ -617,7 +666,6 @@ export default function Home() {
 
             {/* Health Score and Repository Summary */}
             <div className="grid gap-5 lg:grid-cols-3">
-
               {/* Health Score */}
               <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
                 <p className="text-sm font-medium text-slate-400">
@@ -735,6 +783,217 @@ export default function Home() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Repository Health Trend */}
+            <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold">
+                  Repository Health Trend
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Historical repository health score progression
+                </p>
+              </div>
+
+              {healthTrendData.length > 0 ? (
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={healthTrendData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#334155"
+                      />
+
+                      <XAxis
+                        dataKey="date"
+                        stroke="#94a3b8"
+                      />
+
+                      <YAxis
+                        domain={[0, 100]}
+                        stroke="#94a3b8"
+                      />
+
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#0e1528",
+                          border: "1px solid #334155",
+                          borderRadius: "8px",
+                          color: "#ffffff",
+                        }}
+                      />
+
+                      <Line
+                        type="monotone"
+                        dataKey="healthScore"
+                        name="Health Score"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: "#3b82f6" }}
+                        activeDot={{ r: 8 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="py-12 text-center text-slate-500">
+                  No health trend data available.
+                </p>
+              )}
+            </div>
+
+            {/* Historical Analysis Comparison */}
+            <div
+              id="comparison"
+              className="rounded-xl border border-slate-800 bg-[#111a2e] p-6"
+            >
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold">
+                  Historical Analysis Comparison
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Compare the latest repository analysis with a previous saved analysis.
+                </p>
+              </div>
+
+              {latest && history.length > 1 ? (
+                <>
+                  <div className="mb-6">
+                    <label
+                      htmlFor="comparison-analysis"
+                      className="mb-2 block text-sm text-slate-400"
+                    >
+                      Select previous analysis
+                    </label>
+
+                    <select
+                      id="comparison-analysis"
+                      value={previousAnalysis?.id ?? ""}
+                      onChange={(event) => setComparisonId(event.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                    >
+                      {history.slice(1).map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {new Date(item.analyzedAt).toLocaleString()} — Health score{" "}
+                          {item.healthScore}/100
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {previousAnalysis && (
+                    <>
+                      <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg bg-slate-900 p-4">
+                          <p className="text-xs text-slate-500">
+                            Latest analysis
+                          </p>
+
+                          <p className="mt-2 break-all text-sm font-medium text-slate-200">
+                            {latest.id}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {new Date(latest.analyzedAt).toLocaleString()}
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg bg-slate-900 p-4">
+                          <p className="text-xs text-slate-500">
+                            Previous analysis
+                          </p>
+
+                          <p className="mt-2 break-all text-sm font-medium text-slate-200">
+                            {previousAnalysis.id}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {new Date(previousAnalysis.analyzedAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {comparisonMetrics.map((metric) => {
+                          const isHealthScore =
+                            metric.label === "Health Score";
+
+                          const isStagnantFiles =
+                            metric.label === "Stagnant Files";
+
+                          const isPositive =
+                            (isHealthScore && metric.difference > 0) ||
+                            (isStagnantFiles && metric.difference < 0);
+
+                          const isNegative =
+                            (isHealthScore && metric.difference < 0) ||
+                            (isStagnantFiles && metric.difference > 0);
+
+                          return (
+                            <div
+                              key={metric.label}
+                              className="rounded-xl border border-slate-800 bg-slate-900 p-5"
+                            >
+                              <p className="text-sm text-slate-400">
+                                {metric.label}
+                              </p>
+
+                              <p className="mt-4 text-2xl font-bold text-white">
+                                {metric.current.toLocaleString()}
+                              </p>
+
+                              <p className="mt-2 text-xs text-slate-500">
+                                Previous: {metric.previous.toLocaleString()}
+                              </p>
+
+                              <p
+                                className={`mt-3 text-sm font-semibold ${
+                                  isPositive
+                                    ? "text-emerald-400"
+                                    : isNegative
+                                      ? "text-red-400"
+                                      : "text-blue-400"
+                                }`}
+                              >
+                                {metric.difference > 0 ? "+" : ""}
+                                {metric.difference.toLocaleString()}{" "}
+                                {metric.difference === 0 ? "No change" : "change"}
+                              </p>
+
+                              {(isHealthScore || isStagnantFiles) && (
+                                <p
+                                  className={`mt-1 text-xs ${
+                                    isPositive
+                                      ? "text-emerald-400"
+                                      : isNegative
+                                        ? "text-red-400"
+                                        : "text-slate-500"
+                                  }`}
+                                >
+                                  {metric.difference === 0
+                                    ? "No change in this metric"
+                                    : isPositive
+                                      ? "Favorable change"
+                                      : isNegative
+                                        ? "Needs attention"
+                                        : ""}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="rounded-lg bg-slate-900 p-6 text-center text-sm text-slate-400">
+                  At least two saved analyses are required for comparison.
+                </p>
+              )}
             </div>
 
             {/* Analysis History */}
