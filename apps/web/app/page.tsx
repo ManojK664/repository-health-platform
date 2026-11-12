@@ -105,6 +105,9 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
+  // Mobile navigation drawer
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Load dashboard data from the backend API
   // Manual refresh updates data without reloading the browser page.
   const loadDashboard = useCallback(async (isManualRefresh = false) => {
@@ -494,7 +497,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#0b1020] text-slate-100">
       <div className="flex min-h-screen">
-        {/* Sidebar */}
+        {/* Desktop & Tablet Sidebar */}
         <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-[#0e1528] p-6 md:flex md:flex-col">
           <div className="mb-10">
             <div className="flex items-center gap-3">
@@ -519,45 +522,22 @@ export default function Home() {
           </p>
 
           <nav className="space-y-2">
-            <a
-              href="#overview"
-              className="flex items-center gap-3 rounded-lg bg-blue-600/15 px-4 py-3 text-sm font-medium text-blue-400"
-            >
-              <span>▦</span>
-              Overview
-            </a>
-
-            <a
-              href="#metrics"
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            >
-              <span>◈</span>
-              Repository Metrics
-            </a>
-
-            <a
-              href="#comparison"
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            >
-              <span>⇄</span>
-              Analysis Comparison
-            </a>
-
-            <a
-              href="#risk"
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            >
-              <span>⚠</span>
-              Risk Visualization
-            </a>
-
-            <a
-              href="#history"
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            >
-              <span>◷</span>
-              Analysis History
-            </a>
+            {[
+              { href: "#overview", label: "Overview", icon: "▦" },
+              { href: "#metrics", label: "Repository Metrics", icon: "◈" },
+              { href: "#comparison", label: "Analysis Comparison", icon: "⇄" },
+              { href: "#risk", label: "Risk Visualization", icon: "⚠" },
+              { href: "#history", label: "Analysis History", icon: "◷" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              >
+                <span>{link.icon}</span>
+                {link.label}
+              </a>
+            ))}
           </nav>
 
           <div className="mt-auto rounded-xl border border-slate-800 bg-slate-900/70 p-4">
@@ -576,22 +556,98 @@ export default function Home() {
           </div>
         </aside>
 
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <div className="fixed inset-y-0 left-0 flex w-72 flex-col border-r border-slate-800 bg-[#0e1528] p-6 shadow-2xl">
+              <div className="mb-8 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-lg font-bold">
+                    R
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold">RepoHealth</h2>
+                    <p className="text-xs text-slate-400">Intelligence Platform</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-lg border border-slate-700 p-1.5 text-slate-400 hover:text-white"
+                  aria-label="Close menu"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Workspace
+              </p>
+
+              <nav className="space-y-1.5">
+                {[
+                  { href: "#overview", label: "Overview", icon: "▦" },
+                  { href: "#metrics", label: "Repository Metrics", icon: "◈" },
+                  { href: "#comparison", label: "Analysis Comparison", icon: "⇄" },
+                  { href: "#risk", label: "Risk Visualization", icon: "⚠" },
+                  { href: "#history", label: "Analysis History", icon: "◷" },
+                ].map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                  >
+                    <span>{link.icon}</span>
+                    {link.label}
+                  </a>
+                ))}
+              </nav>
+
+              <div className="mt-auto rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                <p className="text-sm font-semibold">System Status</p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-emerald-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  Dashboard online
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Content */}
         <section className="min-w-0 flex-1">
           {/* Header */}
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 bg-[#0e1528] px-5 py-5 md:px-9">
-            <div>
-              <p className="text-xs text-slate-500">
-                Workspace / Overview
-              </p>
+          <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#0e1528]/95 px-4 py-3.5 backdrop-blur sm:px-6 md:px-9 md:py-4">
+            <div className="flex items-center gap-3">
+              {/* Mobile Hamburger Button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white md:hidden"
+                aria-label="Open navigation menu"
+              >
+                ☰
+              </button>
 
-              <h2 className="mt-1 text-xl font-bold">
-                Repository Dashboard
-              </h2>
+              <div>
+                <p className="hidden text-xs text-slate-500 sm:block">
+                  Workspace / Overview
+                </p>
+
+                <h2 className="text-lg font-bold sm:text-xl">
+                  Repository Dashboard
+                </h2>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="hidden rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 lg:inline-block">
                 Local Analysis
               </span>
 
@@ -600,11 +656,16 @@ export default function Home() {
                 type="button"
                 onClick={() => void runAnalysis()}
                 disabled={analyzing || loading}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500 sm:px-4 sm:py-2 sm:text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 title="Run a new repository analysis"
               >
                 <span className={analyzing ? "animate-spin" : ""}>⚙</span>
-                {analyzing ? "Analyzing..." : "Run Analysis"}
+                <span className="hidden sm:inline">
+                  {analyzing ? "Analyzing..." : "Run Analysis"}
+                </span>
+                <span className="sm:hidden">
+                  {analyzing ? "..." : "Run"}
+                </span>
               </button>
 
               {/* Dashboard Refresh Button */}
@@ -612,21 +673,16 @@ export default function Home() {
                 type="button"
                 onClick={() => void loadDashboard(true)}
                 disabled={refreshing || loading}
-                className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-blue-500 hover:bg-blue-500/10 hover:text-blue-400 sm:px-4 sm:py-2 sm:text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 title="Refresh Dashboard"
               >
-                <span className={refreshing ? "animate-spin" : ""}>
-                  ↻
+                <span className={refreshing ? "animate-spin" : ""}>↻</span>
+                <span className="hidden sm:inline">
+                  {refreshing ? "Refreshing..." : loading ? "Loading..." : "Refresh"}
                 </span>
-
-                {refreshing
-                  ? "Refreshing..."
-                  : loading
-                    ? "Loading..."
-                    : "Refresh"}
               </button>
 
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 font-semibold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold sm:h-9 sm:w-9">
                 M
               </div>
             </div>
@@ -634,27 +690,27 @@ export default function Home() {
 
           <div
             id="overview"
-            className="space-y-7 p-5 md:p-9"
+            className="space-y-6 p-4 sm:space-y-7 sm:p-6 lg:p-9"
           >
             {/* Page Heading */}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-sm text-blue-400">
+                <p className="text-xs font-medium uppercase tracking-wider text-blue-400 sm:text-sm">
                   REPOSITORY INTELLIGENCE
                 </p>
 
-                <h1 className="mt-2 text-3xl font-bold tracking-tight">
+                <h1 className="mt-1 text-2xl font-bold tracking-tight sm:mt-2 sm:text-3xl">
                   Overview
                 </h1>
 
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-1 text-xs text-slate-400 sm:mt-2 sm:text-sm">
                   Monitor repository health, development activity and risks.
                 </p>
               </div>
 
               <a
                 href="#history"
-                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
+                className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold transition hover:bg-blue-500 sm:px-4 sm:py-2.5 sm:text-sm"
               >
                 View analysis history →
               </a>
@@ -758,7 +814,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="h-72 w-full">
+                  <div className="h-64 sm:h-72 w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={codeChangesData}>
                         <CartesianGrid
@@ -821,7 +877,7 @@ export default function Home() {
               ) : contributors.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
                   {/* Pie Chart */}
-                  <div className="h-72 min-w-0">
+                  <div className="h-64 sm:h-72 min-w-0 w-full overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -1312,7 +1368,7 @@ export default function Home() {
               </div>
 
               {healthTrendData.length > 0 ? (
-                <div className="h-72 w-full">
+                <div className="h-64 sm:h-72 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={healthTrendData}>
                       <CartesianGrid
@@ -1650,7 +1706,7 @@ export default function Home() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className="bg-slate-900/60 text-xs text-slate-500">
                     <tr>
                       <th className="px-6 py-4 font-medium">Analysis ID</th>
@@ -1910,15 +1966,15 @@ export default function Home() {
           <div className="relative z-10 flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-[#0e1528] shadow-2xl">
 
             {/* Panel Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#0e1528] px-6 py-5">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-[#0e1528] px-4 py-4 sm:px-6 sm:py-5">
               <div>
                 <p className="text-xs text-slate-500">Analysis Details</p>
-                <h2 className="mt-0.5 text-lg font-bold">
+                <h2 className="mt-0.5 text-base font-bold sm:text-lg">
                   {detailPanel ? new Date(detailPanel.analyzedAt).toLocaleString() : "Loading..."}
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {/* Prev / Next navigation */}
                 {detailPanel && (() => {
                   const idx = history.findIndex((h) => h.id === detailPanel.id);
@@ -1928,7 +1984,7 @@ export default function Home() {
                         type="button"
                         onClick={() => navigateDetail("prev")}
                         disabled={idx <= 0}
-                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 transition hover:border-blue-500 hover:text-blue-400 disabled:opacity-30"
+                        className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-400 transition hover:border-blue-500 hover:text-blue-400 disabled:opacity-30 sm:px-3 sm:py-1.5 sm:text-sm"
                         title="Newer analysis"
                       >
                         ← Prev
@@ -1937,7 +1993,7 @@ export default function Home() {
                         type="button"
                         onClick={() => navigateDetail("next")}
                         disabled={idx >= history.length - 1}
-                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 transition hover:border-blue-500 hover:text-blue-400 disabled:opacity-30"
+                        className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-400 transition hover:border-blue-500 hover:text-blue-400 disabled:opacity-30 sm:px-3 sm:py-1.5 sm:text-sm"
                         title="Older analysis"
                       >
                         Next →
@@ -1949,7 +2005,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => { setDetailPanel(null); setDetailError(""); }}
-                  className="ml-2 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 transition hover:border-red-500 hover:text-red-400"
+                  className="ml-1 sm:ml-2 rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-400 transition hover:border-red-500 hover:text-red-400 sm:px-3 sm:py-1.5 sm:text-sm"
                 >
                   ✕ Close
                 </button>
@@ -1957,7 +2013,7 @@ export default function Home() {
             </div>
 
             {/* Panel Body */}
-            <div className="flex-1 space-y-6 p-6">
+            <div className="flex-1 space-y-5 p-4 sm:space-y-6 sm:p-6">
 
               {detailLoading && (
                 <p className="py-20 text-center text-slate-500">Loading analysis details...</p>
