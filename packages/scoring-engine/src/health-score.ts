@@ -54,7 +54,7 @@ export function calculateCollaborationScore(
 
   if (
     topContributorPercentage > 0 &&
-    topContributorPercentage < 100 / contributorCount
+    topContributorPercentage < (100 / contributorCount) - 0.05
   ) {
     throw new Error("Invalid contributor percentage.");
   }
