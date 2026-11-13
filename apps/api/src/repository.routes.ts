@@ -211,7 +211,7 @@ async function handleAnalysisRequest(
       // 2. Clone repository into secure isolated temporary directory
       const cloned = await cloneGitHubRepository(validation.normalizedUrl, {
         depth: 100,
-        timeoutMs: 60000,
+        timeoutMs: 180000, // 3 minutes for large repos
       });
 
       repoPath = cloned.tempDir;

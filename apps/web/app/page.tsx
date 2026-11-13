@@ -34,6 +34,11 @@ type Analysis = {
   stagnantFiles: number;
   healthScore: number;
   healthRating: string;
+  repository?: {
+    id: string;
+    name: string;
+    path: string;
+  };
 };
 
 // Contributor information
@@ -99,6 +104,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
   const [comparisonId, setComparisonId] = useState("");
 
   // Toast notifications
@@ -214,16 +220,28 @@ export default function Home() {
       setAnalyzing(true);
       setAnalyzeError("");
 
-      const response = await fetch(`${API_URL}/analyze`);
+      const trimmedUrl = githubUrl.trim();
 
-      if (!response.ok) {
-        throw new Error(`Analysis failed with status code ${response.status}.`);
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 240000); // 4 min
+
+      const response = await fetch(`${API_URL}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmedUrl || "local" }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(fetchTimeout));
+
+      // Always try to read the JSON body — the backend sends error details even on 4xx/5xx
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Analysis request failed (HTTP ${response.status}). Check that the API server is running.`);
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message ?? "Analysis failed.");
+      if (!response.ok || !data.success) {
+        throw new Error(data.message ?? `Analysis failed (HTTP ${response.status}).`);
       }
 
       await loadDashboard(true);
@@ -697,27 +715,6 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <span className="hidden rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 lg:inline-block">
-                Local Analysis
-              </span>
-
-              {/* Run Analysis Button */}
-              <button
-                type="button"
-                onClick={() => void runAnalysis()}
-                disabled={analyzing || loading}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500 sm:px-4 sm:py-2 sm:text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                title="Run a new repository analysis"
-              >
-                <span className={analyzing ? "animate-spin" : ""}>⚙</span>
-                <span className="hidden sm:inline">
-                  {analyzing ? "Analyzing..." : "Run Analysis"}
-                </span>
-                <span className="sm:hidden">
-                  {analyzing ? "..." : "Run"}
-                </span>
-              </button>
-
               {/* Dashboard Refresh Button */}
               <button
                 type="button"
@@ -775,6 +772,53 @@ export default function Home() {
                   View analysis history →
                 </a>
               </div>
+            </div>
+
+            {/* GitHub URL Input Panel (visible on all screen sizes) */}
+            <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-1 min-w-0 items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 focus-within:border-blue-500 transition">
+                  <span className="shrink-0 text-blue-400 text-base">⎌</span>
+                  <input
+                    type="url"
+                    value={githubUrl}
+                    onChange={(e) => setGithubUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void runAnalysis(); }}
+                    placeholder="https://github.com/owner/repo  (leave empty to analyze local repository)"
+                    className="flex-1 min-w-0 bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none"
+                    aria-label="GitHub repository URL"
+                    disabled={analyzing}
+                  />
+                  {githubUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setGithubUrl("")}
+                      className="shrink-0 text-slate-500 hover:text-slate-300 text-xs"
+                      aria-label="Clear URL"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void runAnalysis()}
+                  disabled={analyzing || loading}
+                  className="shrink-0 flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className={analyzing ? "animate-spin" : ""}>⚙</span>
+                  {analyzing ? "Analyzing..." : "Run Analysis"}
+                </button>
+              </div>
+              {analyzing ? (
+                <p className="mt-2 text-xs text-blue-400 animate-pulse">
+                  ⏳ Cloning and analyzing repository… this may take 1–3 minutes for large repositories.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">
+                  Enter a public GitHub repository URL and click <strong className="text-slate-400">Run Analysis</strong> — or leave the field empty to analyze the local repository.
+                </p>
+              )}
             </div>
 
             {/* Backend Connection Error Banner with Retry Options */}
@@ -1918,6 +1962,7 @@ export default function Home() {
                   <thead className="bg-slate-900/60 text-xs text-slate-500">
                     <tr>
                       <th className="px-6 py-4 font-medium">Analysis ID</th>
+                      <th className="px-6 py-4 font-medium">Repository</th>
                       <th className="px-6 py-4 font-medium">Date</th>
                       <th className="px-6 py-4 font-medium">Commits</th>
                       <th className="px-6 py-4 font-medium">Additions</th>
@@ -1937,6 +1982,9 @@ export default function Home() {
                           <tr key={skeleton} className="animate-pulse">
                             <td className="px-6 py-4">
                               <div className="h-4 w-32 rounded bg-slate-800" />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="h-4 w-24 rounded bg-slate-800" />
                             </td>
                             <td className="px-6 py-4">
                               <div className="h-4 w-20 rounded bg-slate-800" />
@@ -1979,6 +2027,13 @@ export default function Home() {
                         >
                           <td className="max-w-48 truncate px-6 py-4 font-mono text-xs text-blue-400" title={item.id}>
                             {item.id}
+                          </td>
+
+                          <td className="max-w-48 truncate px-6 py-4 text-sm text-slate-300" title={item.repository?.name ?? "Local"}>
+                            {item.repository?.name
+                              ? <span className="flex items-center gap-1.5"><span className="text-xs text-blue-400">⎌</span>{item.repository.name}</span>
+                              : <span className="text-slate-500">Local</span>
+                            }
                           </td>
 
                           <td className="whitespace-nowrap px-6 py-4">
@@ -2050,7 +2105,7 @@ export default function Home() {
                     {!loading && history.length === 0 && (
                       <tr>
                         <td
-                          colSpan={9}
+                          colSpan={10}
                           className="px-6 py-12 text-center"
                         >
                           <div className="mx-auto flex max-w-sm flex-col items-center">
@@ -2078,7 +2133,7 @@ export default function Home() {
                     {!loading && history.length > 0 && filteredHistory.length === 0 && (
                       <tr>
                         <td
-                          colSpan={9}
+                          colSpan={10}
                           className="px-6 py-12 text-center"
                         >
                           <div className="mx-auto flex max-w-sm flex-col items-center">
