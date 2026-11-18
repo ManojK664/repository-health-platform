@@ -13,7 +13,7 @@ const tests: TestCase[] = [
   { url: "http://github.com/torvalds/linux", expectedValid: true, expectedNormalized: "https://github.com/torvalds/linux" },
   { url: "https://www.github.com/vercel/next.js", expectedValid: true, expectedNormalized: "https://github.com/vercel/next.js" },
   { url: "https://github.com/owner-name/repo_name.test", expectedValid: true, expectedNormalized: "https://github.com/owner-name/repo_name.test" },
-  
+
   // Invalid / Unsafe URLs
   { url: "", expectedValid: false },
   { url: "not-a-url", expectedValid: false },

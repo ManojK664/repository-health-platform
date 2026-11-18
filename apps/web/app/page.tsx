@@ -1671,150 +1671,121 @@ export default function Home() {
               id="comparison"
               className="rounded-xl border border-slate-800 bg-[#111a2e] p-6"
             >
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold">
-                  Historical Analysis Comparison
-                </h3>
+              {/* Header with Title and Dropdown */}
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Historical Analysis Comparison
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Compare the latest repository metrics with a previous analysis record.
+                  </p>
+                </div>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Compare the latest repository analysis with a previous saved analysis.
-                </p>
-              </div>
-
-              {latest && history.length > 1 ? (
-                <>
-                  <div className="mb-6">
-                    <label
-                      htmlFor="comparison-analysis"
-                      className="mb-2 block text-sm text-slate-400"
-                    >
-                      Select previous analysis
+                {latest && history.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="comparison-analysis" className="text-xs text-slate-400 whitespace-nowrap">
+                      Compare with:
                     </label>
-
                     <select
                       id="comparison-analysis"
                       value={previousAnalysis?.id ?? ""}
                       onChange={(event) => setComparisonId(event.target.value)}
-                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                      className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white outline-none transition focus:border-blue-500"
                     >
                       {history.slice(1).map((item) => (
                         <option key={item.id} value={item.id}>
-                          {new Date(item.analyzedAt).toLocaleString()} — Health score{" "}
-                          {item.healthScore}/100
+                          {new Date(item.analyzedAt).toLocaleDateString()} — {item.repository?.name ?? "Local"} ({item.healthScore}/100)
                         </option>
                       ))}
                     </select>
                   </div>
+                )}
+              </div>
 
-                  {previousAnalysis && (
-                    <>
-                      <div className="mb-5 grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-lg bg-slate-900 p-4">
-                          <p className="text-xs text-slate-500">
-                            Latest analysis
-                          </p>
-
-                          <p className="mt-2 break-all text-sm font-medium text-slate-200">
-                            {latest.id}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {new Date(latest.analyzedAt).toLocaleString()}
-                          </p>
-                        </div>
-
-                        <div className="rounded-lg bg-slate-900 p-4">
-                          <p className="text-xs text-slate-500">
-                            Previous analysis
-                          </p>
-
-                          <p className="mt-2 break-all text-sm font-medium text-slate-200">
-                            {previousAnalysis.id}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {new Date(previousAnalysis.analyzedAt).toLocaleString()}
-                          </p>
-                        </div>
+              {latest && history.length > 1 && previousAnalysis ? (
+                <>
+                  {/* Two Simple Analysis Summary Cards */}
+                  <div className="mb-6 grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/80 px-4 py-3">
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">Latest Analysis</span>
+                        <p className="text-sm font-medium text-slate-200">{latest.repository?.name ?? "Local Repository"}</p>
+                        <p className="text-xs text-slate-500">{new Date(latest.analyzedAt).toLocaleString()}</p>
                       </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-white">{latest.healthScore}</span>
+                        <span className="text-xs text-slate-400">/100</span>
+                        <p className="text-xs font-semibold text-emerald-400">{latest.healthRating}</p>
+                      </div>
+                    </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        {comparisonMetrics.map((metric) => {
-                          const isHealthScore =
-                            metric.label === "Health Score";
+                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/80 px-4 py-3">
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Previous Analysis</span>
+                        <p className="text-sm font-medium text-slate-200">{previousAnalysis.repository?.name ?? "Local Repository"}</p>
+                        <p className="text-xs text-slate-500">{new Date(previousAnalysis.analyzedAt).toLocaleString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-slate-300">{previousAnalysis.healthScore}</span>
+                        <span className="text-xs text-slate-400">/100</span>
+                        <p className="text-xs font-semibold text-slate-400">{previousAnalysis.healthRating}</p>
+                      </div>
+                    </div>
+                  </div>
 
-                          const isStagnantFiles =
-                            metric.label === "Stagnant Files";
+                  {/* 4 Clean Metric Cards */}
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {comparisonMetrics.map((metric) => {
+                      const isHealthScore = metric.label === "Health Score";
+                      const isStagnantFiles = metric.label === "Stagnant Files";
+                      const isPositive =
+                        (isHealthScore && metric.difference > 0) ||
+                        (isStagnantFiles && metric.difference < 0) ||
+                        (!isHealthScore && !isStagnantFiles && metric.difference > 0);
+                      const isNegative =
+                        (isHealthScore && metric.difference < 0) ||
+                        (isStagnantFiles && metric.difference > 0) ||
+                        (!isHealthScore && !isStagnantFiles && metric.difference < 0);
+                      const isNeutral = metric.difference === 0;
 
-                          const isPositive =
-                            (isHealthScore && metric.difference > 0) ||
-                            (isStagnantFiles && metric.difference < 0);
-
-                          const isNegative =
-                            (isHealthScore && metric.difference < 0) ||
-                            (isStagnantFiles && metric.difference > 0);
-
-                          return (
-                            <div
-                              key={metric.label}
-                              className="rounded-xl border border-slate-800 bg-slate-900 p-5"
+                      return (
+                        <div
+                          key={metric.label}
+                          className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 transition hover:border-slate-700"
+                        >
+                          <p className="text-xs font-medium text-slate-400">{metric.label}</p>
+                          <div className="mt-2 flex items-baseline justify-between">
+                            <span className="text-2xl font-bold text-white">
+                              {metric.current.toLocaleString()}
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${
+                                isNeutral
+                                  ? "bg-slate-800 text-slate-400"
+                                  : isPositive
+                                  ? "bg-emerald-500/15 text-emerald-400"
+                                  : "bg-red-500/15 text-red-400"
+                              }`}
                             >
-                              <p className="text-sm text-slate-400">
-                                {metric.label}
-                              </p>
-
-                              <p className="mt-4 text-2xl font-bold text-white">
-                                {metric.current.toLocaleString()}
-                              </p>
-
-                              <p className="mt-2 text-xs text-slate-500">
-                                Previous: {metric.previous.toLocaleString()}
-                              </p>
-
-                              <p
-                                className={`mt-3 text-sm font-semibold ${
-                                  isPositive
-                                    ? "text-emerald-400"
-                                    : isNegative
-                                      ? "text-red-400"
-                                      : "text-blue-400"
-                                }`}
-                              >
-                                {metric.difference > 0 ? "+" : ""}
-                                {metric.difference.toLocaleString()}{" "}
-                                {metric.difference === 0 ? "No change" : "change"}
-                              </p>
-
-                              {(isHealthScore || isStagnantFiles) && (
-                                <p
-                                  className={`mt-1 text-xs ${
-                                    isPositive
-                                      ? "text-emerald-400"
-                                      : isNegative
-                                        ? "text-red-400"
-                                        : "text-slate-500"
-                                  }`}
-                                >
-                                  {metric.difference === 0
-                                    ? "No change in this metric"
-                                    : isPositive
-                                      ? "Favorable change"
-                                      : isNegative
-                                        ? "Needs attention"
-                                        : ""}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
+                              {isNeutral
+                                ? "No change"
+                                : `${metric.difference > 0 ? "+" : ""}${metric.difference.toLocaleString()}`}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">
+                            Previously: <span className="text-slate-400">{metric.previous.toLocaleString()}</span>
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               ) : (
-                <p className="rounded-lg bg-slate-900 p-6 text-center text-sm text-slate-400">
-                  At least two saved analyses are required for comparison.
-                </p>
+                <div className="rounded-lg bg-slate-900/50 p-6 text-center text-sm text-slate-400">
+                  <p>At least two saved analyses are required for comparison.</p>
+                  <p className="mt-1 text-xs text-slate-500">Run another analysis to view historical progress side-by-side.</p>
+                </div>
               )}
             </div>
 
