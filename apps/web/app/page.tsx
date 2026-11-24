@@ -520,16 +520,38 @@ export default function Home() {
         ]
       : [];
 
+  // Code churn computed summary metrics
+  const churnSummary = useMemo(() => {
+    if (!latest) return null;
+    const additions = latest.totalAdditions;
+    const deletions = latest.totalDeletions;
+    const total = latest.totalChurn;
+    const net = additions - deletions;
+    const addPct = total > 0 ? Math.round((additions / total) * 100) : 0;
+    const delPct = total > 0 ? 100 - addPct : 0;
+
+    return {
+      additions,
+      deletions,
+      total,
+      net,
+      addPct,
+      delPct,
+    };
+  }, [latest]);
+
   // Code churn chart data
   const codeChangesData = latest
     ? [
         {
           name: "Additions",
           lines: latest.totalAdditions,
+          color: "#10b981",
         },
         {
           name: "Deletions",
           lines: latest.totalDeletions,
+          color: "#ef4444",
         },
       ]
     : [];
@@ -953,68 +975,159 @@ export default function Home() {
               id="metrics"
               className="rounded-xl border border-slate-800 bg-[#111a2e] p-6"
             >
+              {/* Header */}
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold">
+                  <h3 className="text-lg font-semibold text-white">
                     Code Churn Analytics
                   </h3>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    Comparison of code additions and deletions
+                  <p className="mt-1 text-sm text-slate-400">
+                    Distribution of code additions, deletions, and net volume
                   </p>
                 </div>
 
-                <span className="rounded-md bg-blue-500/10 px-3 py-1.5 text-xs text-blue-400">
-                  Latest Analysis
-                </span>
+                {churnSummary && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        churnSummary.net >= 0
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                          : "border-red-500/30 bg-red-500/10 text-red-400"
+                      }`}
+                    >
+                      <span>{churnSummary.net >= 0 ? "▲ Net Growth:" : "▼ Net Reduction:"}</span>
+                      <span className="font-bold">
+                        {churnSummary.net >= 0 ? "+" : ""}
+                        {churnSummary.net.toLocaleString()} lines
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
 
               {loading ? (
                 <div className="animate-pulse space-y-6">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-20 rounded-lg bg-slate-900" />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="h-24 rounded-lg bg-slate-900" />
                     ))}
                   </div>
                   <div className="h-64 sm:h-72 w-full rounded-lg bg-slate-900" />
                 </div>
-              ) : latest ? (
+              ) : latest && churnSummary ? (
                 <>
-                  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-lg bg-slate-900 p-4">
-                      <p className="text-xs text-slate-400">
-                        Lines Added
-                      </p>
-
+                  {/* 4 Clean Metric Cards */}
+                  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* Additions */}
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-4 transition hover:border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400">Lines Added</span>
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/15 text-xs font-bold text-emerald-400">
+                          +
+                        </span>
+                      </div>
                       <p className="mt-2 text-2xl font-bold text-emerald-400">
-                        {latest.totalAdditions.toLocaleString()}
+                        {churnSummary.additions.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {churnSummary.addPct}% of total modifications
                       </p>
                     </div>
 
-                    <div className="rounded-lg bg-slate-900 p-4">
-                      <p className="text-xs text-slate-400">
-                        Lines Deleted
-                      </p>
-
+                    {/* Deletions */}
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-4 transition hover:border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400">Lines Deleted</span>
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-red-500/15 text-xs font-bold text-red-400">
+                          −
+                        </span>
+                      </div>
                       <p className="mt-2 text-2xl font-bold text-red-400">
-                        {latest.totalDeletions.toLocaleString()}
+                        {churnSummary.deletions.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {churnSummary.delPct}% of total modifications
                       </p>
                     </div>
 
-                    <div className="rounded-lg bg-slate-900 p-4">
-                      <p className="text-xs text-slate-400">
-                        Total Churn
-                      </p>
-
+                    {/* Total Churn */}
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-4 transition hover:border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400">Total Churn</span>
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/15 text-xs font-bold text-blue-400">
+                          ±
+                        </span>
+                      </div>
                       <p className="mt-2 text-2xl font-bold text-blue-400">
-                        {latest.totalChurn.toLocaleString()}
+                        {churnSummary.total.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Combined change volume
+                      </p>
+                    </div>
+
+                    {/* Net Impact */}
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-4 transition hover:border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400">Net Code Change</span>
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold ${
+                            churnSummary.net >= 0
+                              ? "bg-emerald-500/15 text-emerald-400"
+                              : "bg-red-500/15 text-red-400"
+                          }`}
+                        >
+                          Δ
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-2 text-2xl font-bold ${
+                          churnSummary.net >= 0 ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        {churnSummary.net >= 0 ? "+" : ""}
+                        {churnSummary.net.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {churnSummary.net >= 0 ? "Codebase expansion" : "Codebase consolidation"}
                       </p>
                     </div>
                   </div>
 
+                  {/* Churn Ratio Visual Distribution Bar */}
+                  <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+                    <div className="mb-2 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        <span className="font-medium text-slate-300">
+                          Additions ({churnSummary.addPct}%)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-300">
+                          Deletions ({churnSummary.delPct}%)
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-red-400" />
+                      </div>
+                    </div>
+
+                    {/* Dual segmented bar */}
+                    <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${churnSummary.addPct}%` }}
+                      />
+                      <div
+                        className="bg-red-500 transition-all duration-500"
+                        style={{ width: `${churnSummary.delPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bar Chart with semantic Colors (Green for Additions, Red for Deletions) */}
                   <div className="h-64 sm:h-72 w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={codeChangesData}>
+                      <BarChart data={codeChangesData} barSize={56}>
                         <CartesianGrid
                           strokeDasharray="3 3"
                           stroke="#334155"
@@ -1024,9 +1137,14 @@ export default function Home() {
                         <XAxis
                           dataKey="name"
                           stroke="#94a3b8"
+                          tick={{ fill: "#94a3b8", fontSize: 12 }}
                         />
 
-                        <YAxis stroke="#94a3b8" />
+                        <YAxis
+                          stroke="#94a3b8"
+                          tick={{ fill: "#94a3b8", fontSize: 12 }}
+                          tickFormatter={(val) => Number(val).toLocaleString()}
+                        />
 
                         <Tooltip
                           contentStyle={{
@@ -1035,14 +1153,21 @@ export default function Home() {
                             borderRadius: "8px",
                             color: "#ffffff",
                           }}
+                          formatter={(value: any) => [
+                            `${Number(value).toLocaleString()} lines`,
+                            "Volume",
+                          ]}
                         />
 
                         <Bar
                           dataKey="lines"
-                          name="Lines of code"
-                          fill="#3b82f6"
+                          name="Lines"
                           radius={[6, 6, 0, 0]}
-                        />
+                        >
+                          {codeChangesData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
