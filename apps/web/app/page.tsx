@@ -8,6 +8,9 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -477,13 +480,43 @@ export default function Home() {
     return filteredHistory.slice(start, start + pageSize);
   }, [filteredHistory, currentPage, pageSize]);
 
-  // Repository health score trend
-  const healthTrendData = [...history]
-    .reverse()
-    .map((item) => ({
+  // Repository health score trend data & summary stats
+  const { healthTrendData, trendStats } = useMemo(() => {
+    if (!history || history.length === 0) {
+      return { healthTrendData: [], trendStats: null };
+    }
+
+    const reversed = [...history].reverse();
+    const data = reversed.map((item, idx) => ({
+      index: idx + 1,
+      id: item.id,
       date: new Date(item.analyzedAt).toLocaleDateString(),
+      fullDate: new Date(item.analyzedAt).toLocaleString(),
       healthScore: item.healthScore,
+      healthRating: item.healthRating,
+      repo: item.repository?.name ?? "Local",
     }));
+
+    const scores = history.map((h) => h.healthScore);
+    const latestScore = history[0].healthScore;
+    const earliestScore = reversed[0].healthScore;
+    const peakScore = Math.max(...scores);
+    const lowScore = Math.min(...scores);
+    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const netChange = latestScore - earliestScore;
+
+    return {
+      healthTrendData: data,
+      trendStats: {
+        latestScore,
+        peakScore,
+        lowScore,
+        avgScore,
+        netChange,
+        totalRuns: history.length,
+      },
+    };
+  }, [history]);
 
   // Previous analysis selected for comparison
   const previousAnalysis =
@@ -1726,58 +1759,201 @@ export default function Home() {
 
             {/* Repository Health Trend */}
             <div className="rounded-xl border border-slate-800 bg-[#111a2e] p-6">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold">
-                  Repository Health Trend
-                </h3>
+              {/* Header */}
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Repository Health Trend
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Historical progression of repository health ratings over time
+                  </p>
+                </div>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Historical repository health score progression
-                </p>
+                {trendStats && history.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        trendStats.netChange > 0
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                          : trendStats.netChange < 0
+                          ? "border-red-500/30 bg-red-500/10 text-red-400"
+                          : "border-slate-700 bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      <span>
+                        {trendStats.netChange > 0 ? "▲" : trendStats.netChange < 0 ? "▼" : "→"}
+                      </span>
+                      <span>
+                        {trendStats.netChange > 0
+                          ? `+${trendStats.netChange} pts`
+                          : trendStats.netChange < 0
+                          ? `${trendStats.netChange} pts`
+                          : "Stable"}{" "}
+                        overall
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
 
               {loading ? (
-                <div className="h-64 sm:h-72 w-full animate-pulse rounded-lg bg-slate-900" />
-              ) : healthTrendData.length > 0 ? (
-                <div className="h-64 sm:h-72 w-full min-w-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={healthTrendData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#334155"
-                      />
-
-                      <XAxis
-                        dataKey="date"
-                        stroke="#94a3b8"
-                      />
-
-                      <YAxis
-                        domain={[0, 100]}
-                        stroke="#94a3b8"
-                      />
-
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#0e1528",
-                          border: "1px solid #334155",
-                          borderRadius: "8px",
-                          color: "#ffffff",
-                        }}
-                      />
-
-                      <Line
-                        type="monotone"
-                        dataKey="healthScore"
-                        name="Health Score"
-                        stroke="#3b82f6"
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: "#3b82f6" }}
-                        activeDot={{ r: 8 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="space-y-6 animate-pulse">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="h-16 rounded-lg bg-slate-900" />
+                    ))}
+                  </div>
+                  <div className="h-64 sm:h-72 w-full rounded-lg bg-slate-900" />
                 </div>
+              ) : healthTrendData.length > 0 && trendStats ? (
+                <>
+                  {/* 4 Summary Stat Badges */}
+                  <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5 transition hover:border-slate-700">
+                      <p className="text-xs font-medium text-slate-400">Current Score</p>
+                      <div className="mt-1.5 flex items-baseline gap-2">
+                        <span className="text-xl font-bold text-white">{trendStats.latestScore}</span>
+                        <span className="text-xs text-slate-500">/100</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5 transition hover:border-slate-700">
+                      <p className="text-xs font-medium text-slate-400">Average Score</p>
+                      <div className="mt-1.5 flex items-baseline gap-2">
+                        <span className="text-xl font-bold text-slate-200">{trendStats.avgScore}</span>
+                        <span className="text-xs text-slate-500">/100</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5 transition hover:border-slate-700">
+                      <p className="text-xs font-medium text-slate-400">Peak Score</p>
+                      <div className="mt-1.5 flex items-baseline gap-2">
+                        <span className="text-xl font-bold text-emerald-400">{trendStats.peakScore}</span>
+                        <span className="text-xs text-slate-500">max</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5 transition hover:border-slate-700">
+                      <p className="text-xs font-medium text-slate-400">Lowest Score</p>
+                      <div className="mt-1.5 flex items-baseline gap-2">
+                        <span className="text-xl font-bold text-slate-400">{trendStats.lowScore}</span>
+                        <span className="text-xs text-slate-500">min</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gradient Area Chart */}
+                  <div className="h-64 sm:h-72 w-full min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={healthTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="healthScoreGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#334155"
+                          vertical={false}
+                        />
+
+                        <XAxis
+                          dataKey="date"
+                          stroke="#94a3b8"
+                          tick={{ fill: "#94a3b8", fontSize: 12 }}
+                          tickLine={false}
+                        />
+
+                        <YAxis
+                          domain={[0, 100]}
+                          ticks={[0, 25, 50, 75, 100]}
+                          stroke="#94a3b8"
+                          tick={{ fill: "#94a3b8", fontSize: 12 }}
+                          tickLine={false}
+                        />
+
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#0e1528",
+                            border: "1px solid #334155",
+                            borderRadius: "8px",
+                            color: "#ffffff",
+                          }}
+                          formatter={(value: any) => [`${value}/100`, "Health Score"]}
+                          labelFormatter={(_label: any, payload: any) => {
+                            if (payload && payload[0] && payload[0].payload) {
+                              const item = payload[0].payload;
+                              return `${item.fullDate} (${item.repo})`;
+                            }
+                            return "";
+                          }}
+                        />
+
+                        <ReferenceLine
+                          y={80}
+                          stroke="#10b981"
+                          strokeDasharray="4 4"
+                          strokeOpacity={0.4}
+                          label={{
+                            value: "Healthy (80)",
+                            fill: "#10b981",
+                            fontSize: 10,
+                            position: "insideTopRight",
+                          }}
+                        />
+                        <ReferenceLine
+                          y={60}
+                          stroke="#f59e0b"
+                          strokeDasharray="4 4"
+                          strokeOpacity={0.4}
+                          label={{
+                            value: "Moderate (60)",
+                            fill: "#f59e0b",
+                            fontSize: 10,
+                            position: "insideTopRight",
+                          }}
+                        />
+
+                        <Area
+                          type="monotone"
+                          dataKey="healthScore"
+                          name="Health Score"
+                          stroke="#3b82f6"
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#healthScoreGradient)"
+                          dot={{ r: 4, fill: "#3b82f6", stroke: "#0e1528", strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: "#60a5fa", stroke: "#ffffff", strokeWidth: 2 }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Rating Threshold Legend */}
+                  <div className="mt-4 flex flex-wrap items-center justify-between border-t border-slate-800/80 pt-3 text-xs text-slate-400">
+                    <span className="text-slate-500">
+                      Based on {trendStats.totalRuns} recorded{" "}
+                      {trendStats.totalRuns === 1 ? "analysis" : "analyses"}
+                    </span>
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        Healthy (≥80)
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-yellow-400" />
+                        Moderate (60–79)
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-red-400" />
+                        At Risk (&lt;60)
+                      </span>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-2xl text-blue-400">
